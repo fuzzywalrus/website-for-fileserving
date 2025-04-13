@@ -15,6 +15,7 @@ $excludedItems = [
     '#recycle',
     '.DS_Store',
     'Desktop DB',
-    'Desktop DF'
+    'Desktop DF',
+    '.com.apple.timemachine.supported'
 ];
 ?>

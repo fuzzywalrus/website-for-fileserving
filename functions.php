@@ -172,7 +172,7 @@ function getFileIcon($file) {
         'video' => ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'm4v'],
         'audio' => ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'],
         'image' => ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
-        'document' => ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'],
+        'document' => ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'html', 'htm'],
         'archive' => ['zip', 'rar', '7z', 'tar', 'gz']
     ];
     
@@ -190,7 +190,8 @@ function isPlayable($file) {
     $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
     $playable = [
         'mp4', 'webm', 'ogg', 'mp3', 'wav', 
-        'jpg', 'jpeg', 'png', 'gif', 'pdf'
+        'jpg', 'jpeg', 'png', 'gif', 'pdf',
+        'html', 'htm', 'txt'  // Added HTML and TXT files
     ];
     
     return in_array($extension, $playable);

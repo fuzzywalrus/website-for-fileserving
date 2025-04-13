@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Plex Directory Browser</title>
+    <title>Bourbonic Directory Browser</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -40,13 +40,35 @@
             padding: 0 2px;
             border-radius: 2px;
         }
+        
+        /* Hide modified date column on mobile */
+        @media (max-width: 767.98px) {
+            .modified-column {
+                display: none;
+            }
+            
+            .card-header {
+                flex-direction: column;
+                align-items: stretch !important;
+            }
+            
+            .card-header h2 {
+                margin-bottom: 1rem;
+                text-align: center;
+            }
+            
+            .action-buttons .btn {
+                padding: 0.25rem 0.5rem;
+                font-size: 0.75rem;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h2 class="mb-0">Plex Directory Browser</h2>
+                <h2 class="mb-0">Bourbonic Directory Browser</h2>
                 
                 <!-- Search Form -->
                 <form method="get" class="d-flex">
@@ -108,7 +130,7 @@
                                     <th>Location</th>
                                 <?php endif; ?>
                                 <th>Size</th>
-                                <th>Last Modified</th>
+                                <th class="modified-column">Last Modified</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -183,20 +205,20 @@
                                     <?php endif; ?>
                                     
                                     <td><?= $item['size'] ?></td>
-                                    <td><?= $item['modified'] ?></td>
+                                    <td class="modified-column"><?= $item['modified'] ?></td>
                                     <td class="action-buttons">
                                         <?php if ($item['is_dir']): ?>
                                             <a href="?path=<?= urlencode(str_replace($baseDir . '/', '', $item['path'])) ?>" class="btn btn-sm btn-outline-secondary">
-                                                <i class="fas fa-folder-open"></i> Open
+                                                <i class="fas fa-folder-open"></i> <span class="d-none d-sm-inline">Open</span>
                                             </a>
                                         <?php else: ?>
                                             <a href="<?= htmlspecialchars($item['path']) ?>" download class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-download"></i> Download
+                                                <i class="fas fa-download"></i> <span class="d-none d-sm-inline">Download</span>
                                             </a>
                                             
                                             <?php if (isPlayable($item['name'])): ?>
                                                 <a href="<?= htmlspecialchars($item['path']) ?>" target="_blank" class="btn btn-sm btn-outline-success">
-                                                    <i class="fas fa-play"></i> View
+                                                    <i class="fas fa-play"></i> <span class="d-none d-sm-inline">View</span>
                                                 </a>
                                             <?php endif; ?>
                                         <?php endif; ?>
@@ -208,7 +230,7 @@
                 </div>
             </div>
             <div class="card-footer text-muted text-center">
-                Plex Directory Browser
+                I vibe coded this
             </div>
         </div>
     </div>

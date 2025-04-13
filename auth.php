@@ -58,7 +58,7 @@ function displayLoginForm($error = null) {
                 <div class="col-md-6 col-lg-4">
                     <div class="card login-card">
                         <div class="card-header text-center py-3">
-                            <h4 class="mb-0"><i class="fas fa-server me-2"></i>Plex Directory Browser</h4>
+                            <h4 class="mb-0"><i class="fas fa-server me-2"></i>A mysterious webpage!</h4>
                         </div>
                         <div class="card-body p-4">
                             <?php if ($error): ?>
