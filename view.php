@@ -205,24 +205,31 @@
                                     <?php endif; ?>
                                     
                                     <td><?= $item['size'] ?></td>
-                                    <td class="modified-column"><?= $item['modified'] ?></td>
-                                    <td class="action-buttons">
-                                        <?php if ($item['is_dir']): ?>
-                                            <a href="?path=<?= urlencode(str_replace($baseDir . '/', '', $item['path'])) ?>" class="btn btn-sm btn-outline-secondary">
-                                                <i class="fas fa-folder-open"></i> <span class="d-none d-sm-inline">Open</span>
-                                            </a>
-                                        <?php else: ?>
-                                            <a href="<?= htmlspecialchars($item['path']) ?>" download class="btn btn-sm btn-outline-primary">
-                                                <i class="fas fa-download"></i> <span class="d-none d-sm-inline">Download</span>
-                                            </a>
-                                            
-                                            <?php if (isPlayable($item['name'])): ?>
-                                                <a href="<?= htmlspecialchars($item['path']) ?>" target="_blank" class="btn btn-sm btn-outline-success">
-                                                    <i class="fas fa-play"></i> <span class="d-none d-sm-inline">View</span>
-                                                </a>
-                                            <?php endif; ?>
-                                        <?php endif; ?>
-                                    </td>
+<td class="modified-column"><?= $item['modified'] ?></td>
+<td class="action-buttons">
+    <?php if ($item['is_dir']): ?>
+        <a href="?path=<?= urlencode(str_replace($baseDir . '/', '', $item['path'])) ?>" class="btn btn-sm btn-outline-secondary">
+            <i class="fas fa-folder-open"></i> <span class="d-none d-sm-inline">Open</span>
+        </a>
+    <?php else: ?>
+        <?php 
+            // Get relative path for this file
+            $relativePath = str_replace($baseDir . '/', '', $item['path']);
+            // Create file ID
+            $fileId = encryptPath($relativePath);
+        ?>
+        <a href="file-handler.php?id=<?= $fileId ?>&download=1" class="btn btn-sm btn-outline-primary">
+            <i class="fas fa-download"></i> <span class="d-none d-sm-inline">Download</span>
+        </a>
+        
+        <?php if (isPlayable($item['name'])): ?>
+            <a href="file-handler.php?id=<?= $fileId ?>" target="_blank" class="btn btn-sm btn-outline-success">
+                <i class="fas fa-play"></i> <span class="d-none d-sm-inline">View</span>
+            </a>
+        <?php endif; ?>
+    <?php endif; ?>
+</td>
+                             
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -230,7 +237,7 @@
                 </div>
             </div>
             <div class="card-footer text-muted text-center">
-                I vibe coded this
+                1695 Audiobooks (716 GB), 1718 movies (9.18 TB), 26,700+ ROMs (2.08 TB)
             </div>
         </div>
     </div>
