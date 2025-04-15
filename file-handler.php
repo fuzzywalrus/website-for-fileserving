@@ -5,6 +5,9 @@ session_start();
 // Include configuration file
 require_once 'config.php';
 
+// Include functions file (for decryptPath)
+require_once 'functions.php';
+
 // Authentication check - must happen before ANY output
 if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
     // Save the requested URL for redirect after login
@@ -13,6 +16,19 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
     // Redirect to login page
     header('Location: index.php');
     exit;
+}
+
+// If we have a file ID, decode it
+if (isset($_GET['id']) && !empty($_GET['id'])) {
+    // Get the file path from the hash
+    $decrypted = decryptPath($_GET['id']);
+    
+    if ($decrypted !== false) {
+        $_GET['path'] = $decrypted;
+    } else {
+        header('HTTP/1.1 400 Bad Request');
+        exit('Invalid file ID');
+    }
 }
 
 // Get the requested file path
@@ -84,14 +100,6 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('X-XSS-Protection: 1; mode=block');
 
-// Set a non-guessable token for this download session
-$downloadToken = md5(session_id() . time() . $realFilePath);
-$_SESSION['download_tokens'][$downloadToken] = [
-    'file' => $realFilePath,
-    'expires' => time() + 3600 // Token expires in 1 hour
-];
-
 // Output the file content
 readfile($realFilePath);
 exit;
-?>

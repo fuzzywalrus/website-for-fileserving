@@ -202,4 +202,36 @@ function isPlayable($file) {
     
     return in_array($extension, $playable);
 }
-?>
+
+/**
+ * Generate an encrypted ID for a file path
+ */
+function encryptPath($path) {
+    global $encryptionKey;
+    
+    // Create a simple hash from the path and key
+    $hash = md5($encryptionKey . $path . time());
+    
+    // Store the hash-to-path mapping in the session
+    if (!isset($_SESSION['path_hashes'])) {
+        $_SESSION['path_hashes'] = array();
+    }
+    
+    // Store the mapping
+    $_SESSION['path_hashes'][$hash] = $path;
+    
+    // Return the hash as the file ID
+    return $hash;
+}
+
+/**
+ * Decrypt a file path from its hashed ID
+ */
+function decryptPath($hash) {
+    // Check if we have this hash stored
+    if (isset($_SESSION['path_hashes'][$hash])) {
+        return $_SESSION['path_hashes'][$hash];
+    }
+    
+    return false;
+}

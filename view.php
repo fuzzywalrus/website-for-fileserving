@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bourbonic Directory Browser</title>
+    <title><?= htmlspecialchars($siteTitle) ?></title>
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -68,7 +68,7 @@
     <div class="container">
         <div class="card mb-4">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h2 class="mb-0">Bourbonic Directory Browser</h2>
+                <h2 class="mb-0"><?= htmlspecialchars($siteTitle) ?></h2>
                 
                 <!-- Search Form -->
                 <form method="get" class="d-flex">
@@ -237,7 +237,7 @@
                 </div>
             </div>
             <div class="card-footer text-muted text-center">
-                1695 Audiobooks (716 GB), 1718 movies (9.18 TB), 26,700+ ROMs (2.08 TB)
+                <?= htmlspecialchars($siteStats) ?>
             </div>
         </div>
     </div>

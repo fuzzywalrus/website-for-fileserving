@@ -50,3 +50,21 @@ sudo mount --bind /volume1/Plex /volume1/web/plex
 Save and exit (press Esc, then type :wq and press Enter)
 
 
+##  Configuration
+
+You'll need to create .env file in the root fo the directory Here is how it should be formmated.
+
+```
+# Directory browser configuration
+BASE_DIR=./
+PASSWORD=password
+ENCRYPTION_KEY=gNMf29plIcP5mL0pVh2JkcE7xWq6QaB9n
+
+# Site customization
+SITE_TITLE=My Directory Browser
+SITE_STATS=Cool Message Goes here!
+
+# Files and directories to exclude from listing
+# Comma-separated list
+EXCLUDED_ITEMS=@eaDir,#recycle,.DS_Store,Desktop DB,Desktop DF
+```
