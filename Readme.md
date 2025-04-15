@@ -12,7 +12,7 @@ I wrote this so I could create a private web server to share files with a few fr
 - 🔍 Built-in file name search
 - 📄 HTML document preview
 - 🔒 Simple password protection
-- 🛡️ Secure file URLs (obfuscated as `file-handler.php?id=88bed9cf31e56c7fe7f165&download=1`)
+- 🛡️ Secure file URLs (obfuscated as `file-handler.php?id=88bed9cf31e56c7fe7f165&download=1`) + traversal protection, double encoding protection, recursively decoding URL Params, and sanitation for URL paths, and validates file names, and moved to HMCA SHA-256, and escaping. 
 - 🎬 Preview media files directly in browser
 - 🔄 Easy to customize
 
