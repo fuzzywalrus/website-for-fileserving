@@ -34,14 +34,20 @@ if (!empty($missingVars)) {
     }
 }
 
-// Base directory to browse
+// Primary configuration settings
 $baseDir = $_ENV['BASE_DIR'];
-
-// Password for accessing the directory browser
 $password = $_ENV['PASSWORD'];
-
-// Encryption key for URL obfuscation
 $encryptionKey = $_ENV['ENCRYPTION_KEY'];
+
+// Secondary password settings (optional)
+$hasSecondaryPassword = isset($_ENV['SECONDARY_PASSWORD']) && !empty($_ENV['SECONDARY_PASSWORD']);
+$secondaryPassword = $hasSecondaryPassword ? $_ENV['SECONDARY_PASSWORD'] : '';
+$secondaryBaseDir = isset($_ENV['SECONDARY_BASE_DIR']) && !empty($_ENV['SECONDARY_BASE_DIR']) ? 
+    $_ENV['SECONDARY_BASE_DIR'] : $baseDir;
+$secondaryTitle = isset($_ENV['SECONDARY_TITLE']) && !empty($_ENV['SECONDARY_TITLE']) ? 
+    $_ENV['SECONDARY_TITLE'] : $_ENV['SITE_TITLE'] ?? 'Directory Browser';
+$secondaryStats = isset($_ENV['SECONDARY_STATS']) && !empty($_ENV['SECONDARY_STATS']) ? 
+    $_ENV['SECONDARY_STATS'] : $_ENV['SITE_STATS'] ?? '';
 
 // Files and directories to exclude from listing
 $excludedItems = isset($_ENV['EXCLUDED_ITEMS']) ? 
@@ -50,5 +56,4 @@ $excludedItems = isset($_ENV['EXCLUDED_ITEMS']) ?
 
 // Site customization settings
 $siteTitle = $_ENV['SITE_TITLE'] ?? 'Directory Browser';
-$siteStats = $_ENV['SITE_STATS'] ?? 'Self Hosted!' ;
-?>
+$siteStats = $_ENV['SITE_STATS'] ?? '';

@@ -10,31 +10,71 @@ session_start();
 
 // Check authentication status
 $isAuthenticated = false;
+$isSecondaryUser = false;
 
 // Check if user is already authenticated
 if (isset($_SESSION['authenticated']) && $_SESSION['authenticated'] === true) {
     $isAuthenticated = true;
+    
+    // Check if they're using the secondary password
+    if (isset($_SESSION['is_secondary_user']) && $_SESSION['is_secondary_user'] === true) {
+        $isSecondaryUser = true;
+    }
 }
 
 // Handle login form submission
 if (isset($_POST['password'])) {
-    if ($_POST['password'] === $password) {
+    $submittedPassword = $_POST['password'];
+    
+    // Check against primary password
+    if ($submittedPassword === $password) {
         $_SESSION['authenticated'] = true;
+        $_SESSION['is_secondary_user'] = false;
         $isAuthenticated = true;
-    } else {
+        $isSecondaryUser = false;
+    } 
+    // Check against secondary password if configured
+    elseif ($hasSecondaryPassword && $submittedPassword === $secondaryPassword) {
+        $_SESSION['authenticated'] = true;
+        $_SESSION['is_secondary_user'] = true;
+        $isAuthenticated = true;
+        $isSecondaryUser = true;
+    } 
+    // Invalid password
+    else {
         $loginError = "Incorrect password. Please try again.";
     }
+    
+    // Redirect to clear POST data
+    if ($isAuthenticated && !isset($loginError)) {
+        // Preserve any redirect URL if it exists
+        $redirectUrl = isset($_SESSION['redirect_after_login']) ? 
+            $_SESSION['redirect_after_login'] : 'index.php';
+        unset($_SESSION['redirect_after_login']);
+        
+        header('Location: ' . $redirectUrl);
+        exit;
+    }
+}
+
+// After authentication, set the appropriate base directory, title, and stats
+if ($isAuthenticated && $isSecondaryUser) {
+    // For secondary users, use the secondary directory, title, and stats
+    $baseDir = $secondaryBaseDir;
+    $siteTitle = $secondaryTitle;
+    $siteStats = $secondaryStats;
 }
 
 // Function to display the login form
 function displayLoginForm($error = null) {
+    global $siteTitle;
     ?>
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Plex Directory Browser - Login</title>
+        <title><?= htmlspecialchars($siteTitle) ?> - Login</title>
         <!-- Bootstrap CSS -->
         <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
         <!-- Font Awesome -->
@@ -64,7 +104,7 @@ function displayLoginForm($error = null) {
                 <div class="col-md-6 col-lg-4">
                     <div class="card login-card">
                         <div class="card-header text-center py-3">
-                            <h4 class="mb-0"><i class="fas fa-server me-2"></i>Plex Directory Browser</h4>
+                            <h4 class="mb-0"><i class="fas fa-server me-2"></i><?= htmlspecialchars($siteTitle) ?></h4>
                         </div>
                         <div class="card-body p-4">
                             <?php if ($error): ?>

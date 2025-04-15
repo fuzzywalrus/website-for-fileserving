@@ -37,6 +37,10 @@ ENCRYPTION_KEY=use_a_strong_random_32_character_key
 SITE_TITLE=My Directory Browser
 SITE_STATS=Custom message for the footer goes here!
 
+SECONDARY_PASSWORD=guest_password_here
+SECONDARY_BASE_DIR=./limited_access_directory
+SECONDARY_TITLE=Guest Access Portal
+
 # Files and directories to exclude from listing
 # Comma-separated list
 EXCLUDED_ITEMS=@eaDir,#recycle,.DS_Store,Desktop DB,Desktop DF
@@ -44,6 +48,10 @@ EXCLUDED_ITEMS=@eaDir,#recycle,.DS_Store,Desktop DB,Desktop DF
 # Environment (development/production)
 ENVIRONMENT=production
 ```
+
+### Secondary Access
+
+Since I imagine many people want a secondary account class, you can specify another password and directory. 
 
 ### Important Notes:
 - Replace `your_secure_password` with a strong password
