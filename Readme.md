@@ -1,8 +1,10 @@
 # Synology (Or NAS) Web File Browser
 
-Share files with your friends and family! This simple PHP application lets you create your own personal file-sharing website using your Synology NAS (or any web server with PHP support). Create a private file server that's easy to use and secure.
+Share files with your friends and family! This simple PHP application lets you create your own personal file-sharing website using your Synology NAS (or any web server with PHP support). Create a private file server that's easy to use and (fairly) secure.
 
 ![screenshot](https://i.imgur.com/SPCMAOc.png)
+
+I wrote this so I could create a private web server to share files with a few friends and family members. If you have FiOS then you're certainly capable of hosting your own accessible-over-http file server.
 
 ## Features
 
@@ -83,6 +85,8 @@ You can use any DDNS service. [No-IP](https://www.noip.com/) is recommended for 
 3. You'll need to be able to access your website from your domain name
 
 ### 3. Link Your Content Directory
+
+This is optional but if you want to link to files hosted elsewhere on your NAS you'll need to bind the directory as symbolic links will not work.
 
 Connect to your NAS via SSH:
 
