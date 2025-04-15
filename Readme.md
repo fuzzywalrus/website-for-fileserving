@@ -2,6 +2,8 @@
 
 Share files with your friends and family! This simple PHP application lets you create your own personal file-sharing website using your Synology NAS (or any web server with PHP support). Create a private file server that's easy to use and secure.
 
+![screenshot](https://i.imgur.com/SPCMAOc.png)
+
 ## Features
 
 - ✨ Clean, responsive Bootstrap UI
