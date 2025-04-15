@@ -1,4 +1,10 @@
 <?php
+// Security: Prevent direct file access
+if (basename($_SERVER['SCRIPT_FILENAME']) === basename(__FILE__)) {
+    header('HTTP/1.1 403 Forbidden');
+    exit('Direct access not permitted');
+}
+
 // Function to get current directory from URL
 function getCurrentDirectory($baseDir) {
     $currentDir = $baseDir;

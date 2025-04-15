@@ -1,14 +1,18 @@
 <?php
+// Immediate session start for authentication
+session_start();
+
 // Include configuration file
 require_once 'config.php';
 
-// Include authentication file
-require_once 'auth.php';
-
-// If not authenticated, deny access
-if (!$isAuthenticated) {
-    header('HTTP/1.1 403 Forbidden');
-    exit('Access Denied');
+// Authentication check - must happen before ANY output
+if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
+    // Save the requested URL for redirect after login
+    $_SESSION['redirect_after_login'] = $_SERVER['REQUEST_URI'];
+    
+    // Redirect to login page
+    header('Location: index.php');
+    exit;
 }
 
 // Get the requested file path
@@ -55,11 +59,14 @@ $contentTypes = [
     'wav' => 'audio/wav'
 ];
 
+// Force download mode
+$forceDownload = isset($_GET['download']) && $_GET['download'] === '1';
+
 // Set the content type header
-if (isset($contentTypes[$extension])) {
+if (isset($contentTypes[$extension]) && !$forceDownload) {
     header('Content-Type: ' . $contentTypes[$extension]);
 } else {
-    // For unknown types, use octet-stream and force download
+    // For unknown types or when forcing download, use octet-stream
     header('Content-Type: application/octet-stream');
     header('Content-Disposition: attachment; filename="' . basename($realFilePath) . '"');
 }
@@ -71,6 +78,18 @@ header('Content-Length: ' . filesize($realFilePath));
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Cache-Control: post-check=0, pre-check=0', false);
 header('Pragma: no-cache');
+
+// Add security headers
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('X-XSS-Protection: 1; mode=block');
+
+// Set a non-guessable token for this download session
+$downloadToken = md5(session_id() . time() . $realFilePath);
+$_SESSION['download_tokens'][$downloadToken] = [
+    'file' => $realFilePath,
+    'expires' => time() + 3600 // Token expires in 1 hour
+];
 
 // Output the file content
 readfile($realFilePath);

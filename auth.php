@@ -1,4 +1,10 @@
 <?php
+// Security: Prevent direct file access
+if (basename($_SERVER['SCRIPT_FILENAME']) === basename(__FILE__)) {
+    header('HTTP/1.1 403 Forbidden');
+    exit('Direct access not permitted');
+}
+
 // Start the session for password protection
 session_start();
 
@@ -58,7 +64,7 @@ function displayLoginForm($error = null) {
                 <div class="col-md-6 col-lg-4">
                     <div class="card login-card">
                         <div class="card-header text-center py-3">
-                            <h4 class="mb-0"><i class="fas fa-server me-2"></i>A mysterious webpage!</h4>
+                            <h4 class="mb-0"><i class="fas fa-server me-2"></i>Plex Directory Browser</h4>
                         </div>
                         <div class="card-body p-4">
                             <?php if ($error): ?>

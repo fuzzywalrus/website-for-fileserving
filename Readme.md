@@ -48,3 +48,5 @@ Add the mount command before the exit 0 line:
 sudo mount --bind /volume1/Plex /volume1/web/plex
 
 Save and exit (press Esc, then type :wq and press Enter)
+
+
