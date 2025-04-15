@@ -176,6 +176,10 @@ tunnel run --token <YOUR_TOKEN>
    * Ensure the resource loads securely, and that non-authorized access is blocked.
 
 
+# More security recommendations
+
+Based on community feedback, it's best to adhere to  defense in depth and principle of least privilege. It's recommended to use an inexpensive server, like a Raspberry Pi 4. Set it up by tunneling to Cloudflare (the Docker solution is low friction), create a web host environment and mount your NAS volume with an account with minimium priviledges. Use this project to server your files. I'll be updating this section as I impliment this myself.
+
 ### Not very secure way
 
 1. Open DSM
