@@ -1,0 +1,189 @@
+/* Light theme (default) */
+:root {
+    --bg-color: #f8f9fa;
+    --text-color: #212529;
+    --card-bg: #ffffff;
+    --card-header-bg: #f8f9fa;
+    --card-border: rgba(0, 0, 0, 0.125);
+    --table-hover-bg: rgba(0, 123, 255, 0.075);
+    --table-header-bg: #f8f9fa;
+    --search-highlight-bg: #fff3cd;
+    --btn-outline: #6c757d;
+    --alert-info-bg: rgba(23, 162, 184, 0.1);
+    --alert-info-border: rgba(23, 162, 184, 0.2);
+}
+
+/* Dark theme (automatically applied when user prefers dark mode) */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #212529;
+        --text-color: #f8f9fa;
+        --card-bg: #343a40;
+        --card-header-bg: #2c3136;
+        --card-border: rgba(255, 255, 255, 0.125);
+        --table-hover-bg: rgba(255, 255, 255, 0.05);
+        --table-header-bg: #2c3136;
+        --search-highlight-bg: #664d03;
+        --btn-outline: #adb5bd;
+        --alert-info-bg: rgba(23, 162, 184, 0.1);
+        --alert-info-border: rgba(23, 162, 184, 0.2);
+        --bs-border-color: rgba(23, 162, 184, 0.2);
+    }
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    padding-top: 20px;
+    padding-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+/* Card styles */
+.card {
+    border: none;
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: all 0.3s ease;
+}
+
+.card-header {
+    background-color: var(--card-header-bg);
+    border-bottom: 1px solid var(--card-border);
+    color: var(--text-color);
+}
+
+.card-footer {
+    background-color: var(--card-header-bg);
+    border-top: 1px solid var(--card-border);
+}
+
+/* Table styles */
+.table {
+    color: var(--text-color);
+}
+
+.table-light {
+    background-color: var(--table-header-bg);
+    color: var(--text-color);
+}
+
+.table-hover tbody tr:hover {
+    background-color: var(--table-hover-bg);
+}
+
+.breadcrumb {
+    background-color: transparent;
+}
+
+.breadcrumb-item.active {
+    color: var(--text-color);
+}
+
+.breadcrumb-item a {
+    color: var(--text-color);
+    opacity: 0.8;
+}
+
+.breadcrumb-item a:hover {
+    opacity: 1;
+}
+
+/* Form elements */
+.form-control {
+    background-color: var(--card-bg);
+    border-color: var(--card-border);
+    color: var(--text-color);
+}
+
+.form-control:focus {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+}
+
+/* Alert styles */
+.alert-info {
+    background-color: var(--alert-info-bg);
+    border-color: var(--alert-info-border);
+    color: var(--text-color);
+}
+
+/* File icons */
+.directory-icon { color: #ffc107; }
+.video-icon { color: #dc3545; }
+.audio-icon { color: #28a745; }
+.image-icon { color: #17a2b8; }
+.document-icon { color: #6610f2; }
+.archive-icon { color: #fd7e14; }
+.diskimage-icon { color: #20c997; } /* Teal color for disk image files */
+.rom-icon { color: #9c27b0; } /* Purple color for ROM files */
+.file-icon { margin-right: 10px; }
+
+/* Button styles */
+.btn-outline-secondary {
+    color: var(--btn-outline);
+    border-color: var(--btn-outline);
+}
+
+.search-highlight {
+    background-color: var(--search-highlight-bg);
+    padding: 0 2px;
+    border-radius: 2px;
+    color: #fff;
+}
+
+.action-buttons .btn {
+    margin-right: 5px;
+}
+
+/* Login page specific styles */
+.login-card {
+    width: 350px;
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+/* Hide modified date column on mobile */
+@media (max-width: 767.98px) {
+   
+    .modified-column {
+        display: none;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        align-items: stretch !important;
+    }
+    
+    .card-header h2 {
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    
+    .action-buttons .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* Dark theme (automatically applied when user prefers dark mode) */
+@media (prefers-color-scheme: dark) {
+    .table {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+    }
+    .table > :not(caption) > * > * {
+        background-color: var(--bg-color);
+        color: var(--text-color);
+    }
+    body a {
+        color: rgb(171, 205, 255);
+    }
+    input::placeholder {
+        color: var(--text-color);
+    }
+    .breadcrumb-item + .breadcrumb-item::before {
+        color: var(--text-color);
+    }
+}

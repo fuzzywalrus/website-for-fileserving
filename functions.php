@@ -178,8 +178,21 @@ function getFileIcon($file) {
         'video' => ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'm4v'],
         'audio' => ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'],
         'image' => ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'],
-        'document' => ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'html', 'htm'],
-        'archive' => ['zip', 'rar', '7z', 'tar', 'gz']
+        'document' => ['pdf', 'doc', 'lit', 'nfo', 'docx', 'txt', 'rtf', 'odt', 'html', 'htm'],
+        'archive' => ['zip', 'rar', '7z', 'tar', 'gz'],
+        'diskimage' => ['iso', 'img', 'dmg', 'vhd', 'vmdk', 'qcow2'], // New category for disk image files
+        'rom' => [
+            // Nintendo
+            'nes', 'snes', 'n64', 'z64', 'nsp', 'xci', 'gba', 'gbc', 'gb', '3ds', 'nds', 'wbfs', 'gcm', 'cxi', 'cia',
+            // Sony
+            'cso', 'bin', 'mdf', 'pbp', 'chd',
+            // Sega
+            'md', 'smd', 'gen', 'sms', 'gg', 'sg', '32x', 'cdi',
+            // Atari
+            'a26', 'a52', 'a78', 'j64',
+            // Other systems
+            'rom', 'ic1', 'nvm', 'mec', 'erom', 'v64'
+        ]
     ];
     
     foreach ($icons as $type => $extensions) {
