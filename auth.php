@@ -74,14 +74,15 @@ function displayLoginForm($error = null) {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="color-scheme" content="light dark">
         <title><?= htmlspecialchars($siteTitle) ?> - Login</title>
         <!-- Bootstrap CSS -->
         <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
         <!-- Font Awesome -->
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+        <link rel="stylesheet" href="styles.css">
         <style>
             body {
-                background-color: #f8f9fa;
                 height: 100vh;
                 display: flex;
                 align-items: center;
@@ -91,10 +92,6 @@ function displayLoginForm($error = null) {
                 width: 350px;
                 border: none;
                 box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
-            }
-            .card-header {
-                background-color: #f8f9fa;
-                border-bottom: 1px solid rgba(0, 0, 0, 0.125);
             }
         </style>
     </head>
