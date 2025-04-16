@@ -89,7 +89,6 @@ function displayLoginForm($error = null) {
                 justify-content: center;
             }
             .login-card {
-                width: 350px;
                 border: none;
                 box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
             }
@@ -98,7 +97,7 @@ function displayLoginForm($error = null) {
     <body>
         <div class="container">
             <div class="row justify-content-center">
-                <div class="col-md-6 col-lg-4">
+                <div class="col-md-7 col-lg-5">
                     <div class="card login-card">
                         <div class="card-header text-center py-3">
                             <h4 class="mb-0"><i class="fas fa-server me-2"></i><?= htmlspecialchars($siteTitle) ?></h4>
