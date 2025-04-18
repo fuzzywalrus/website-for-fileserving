@@ -2,6 +2,8 @@
 
 Share files with your friends and family! This simple PHP application lets you create your own personal file-sharing website using your Synology NAS (or any web server with PHP support). Create a private file server that's easy to use and (fairly) secure. Run the HTTP server from a Raspberry Pi to metal gap your NAS.
 
+This allows Synology-like File Station on any NAS, and allows for more customized experience and less exposed solution for Synology users. Host your HTTP server on a separate computer or virtual machine or however you like.
+
 ![screenshot](https://i.imgur.com/SPCMAOc.png)
 
 I wrote this so I could create a private web server to share files with a few friends and family members. If you have FiOS then you're certainly capable of hosting your own accessible-over-http file server.
@@ -15,6 +17,8 @@ I wrote this so I could create a private web server to share files with a few fr
 - 🛡️ Secure file URLs (obfuscated as `file-handler.php?id=88bed9cf31e56c7fe7f165&download=1`) + traversal protection, double encoding protection, recursively decoding URL Params, and sanitation for URL paths, and validates file names, and moved to HMCA SHA-256, and escaping. 
 - 🎬 Preview media files directly in browser
 - 🔄 Easy to customize
+- 🔑 Instructions for CloudFlare Tunnel for reverse proxy protection
+- 💾 Apache and NGNIX agnostic, use your preferred hosting
 
 ## Installation
 
@@ -216,9 +220,9 @@ docker logs cloudflared
 
 The Zero Trust panel will tell you if your tunnel is connected correctly. At this point, you should be able to test your webserver from your domain.  
 
-**You'll need to mount your NAS volum**  into the `/var/www/html`
+**You'll need to mount your NAS volum**  into the `/var/www/html` or you will need to directly host files in a directory on your webserver.
 
-Install the PHP from this  files into the `html` and create the .env file and be sure to set the mounted volume as the BASE_DIR.
+Install the PHP from this  files into the `html` and create the .env file and be sure to set the mounted volume or the directory of your chosing as the BASE_DIR.
 
 
 ## 11. Optional: Configure basic firewall
@@ -233,25 +237,6 @@ sudo ufw enable
 ```
 
 If your router supports VLAN, I recommend placing your web server computer in it's own VLAN and only giving it minimal access. This continues  defense in depth and principle of least privilege. If your http server gets pnwd, all that'd be exposed is the SMB share with read only privs. 
-
-
-### Synology only route (easier but less sucure) 
-
-1. **Download the Docker Image:**
-   * Open the Synology Docker application.
-   * Go to **Registry** and search for `cloudflare/cloudflared`; download the `latest` image.
-2. **Create and Configure the Container:**
-   * Launch the image to create a new container.
-   * **Network Mode:** Use the same network as the Docker host.
-   * **Container Name:** For example, `cloudflared-connector`.
-   * **Auto-Restart:** Enable auto-restart.
-   * **Command Configuration:**
-      * Edit the execution command (under Advanced Settings) by pasting a modified command string. Remove extraneous parts so that it resembles:
-
-```
-tunnel run --token <YOUR_TOKEN>
-```
-
 
 
 ### 3. Link Your Content Directory
@@ -292,11 +277,10 @@ Save and exit (press Esc, then type `:wq` and press Enter)
 
 ## Security Considerations
 
-- Always use HTTPS with a valid SSL certificate
 - Choose a strong password and encryption key
 - Regularly update your PHP version
 - Be careful about what content you share
-- Consider setting up a reverse proxy for added security
+- Place your HTTP server on a VLAN 
 
 ## Troubleshooting
 
