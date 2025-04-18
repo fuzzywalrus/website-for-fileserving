@@ -8,61 +8,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body {
-            background-color: #f8f9fa;
-            padding-top: 20px;
-            padding-bottom: 20px;
-        }
-        .directory-icon { color: #ffc107; }
-        .video-icon { color: #dc3545; }
-        .audio-icon { color: #28a745; }
-        .image-icon { color: #17a2b8; }
-        .document-icon { color: #6610f2; }
-        .archive-icon { color: #fd7e14; }
-        .file-icon { margin-right: 10px; }
-        .table-hover tbody tr:hover {
-            background-color: rgba(0, 123, 255, 0.075);
-        }
-        .action-buttons .btn {
-            margin-right: 5px;
-        }
-        .card {
-            border: none;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-        }
-        .card-header {
-            background-color: #f8f9fa;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.125);
-        }
-        .search-highlight {
-            background-color: #fff3cd;
-            padding: 0 2px;
-            border-radius: 2px;
-        }
-        
-        /* Hide modified date column on mobile */
-        @media (max-width: 767.98px) {
-            .modified-column {
-                display: none;
-            }
-            
-            .card-header {
-                flex-direction: column;
-                align-items: stretch !important;
-            }
-            
-            .card-header h2 {
-                margin-bottom: 1rem;
-                text-align: center;
-            }
-            
-            .action-buttons .btn {
-                padding: 0.25rem 0.5rem;
-                font-size: 0.75rem;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
@@ -123,7 +69,7 @@
                 <!-- Directory contents table -->
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
-                        <thead class="table-light">
+                        <thead class="table">
                             <tr>
                                 <th>Name</th>
                                 <?php if ($isSearchRequest): ?>
@@ -161,6 +107,10 @@
                                                 <i class="fas fa-file-alt document-icon file-icon fa-lg"></i>
                                             <?php elseif ($item['type'] === 'archive'): ?>
                                                 <i class="fas fa-archive archive-icon file-icon fa-lg"></i>
+                                            <?php elseif ($item['type'] === 'diskimage'): ?>
+                                                <i class="fas fa-compact-disc diskimage-icon file-icon fa-lg"></i>
+                                            <?php elseif ($item['type'] === 'rom'): ?>
+                                                <i class="fas fa-gamepad rom-icon file-icon fa-lg"></i>
                                             <?php else: ?>
                                                 <i class="fas fa-file file-icon fa-lg"></i>
                                             <?php endif; ?>
@@ -218,9 +168,9 @@
             // Create file ID
             $fileId = encryptPath($relativePath);
         ?>
-<a href="file-handler.php?id=<?= $fileId ?>&download=1" class="btn btn-sm btn-outline-primary" target="_blank">
-    <i class="fas fa-download"></i> <span class="d-none d-sm-inline">Download</span>
-</a>
+        <a href="file-handler.php?id=<?= $fileId ?>&download=1" class="btn btn-sm btn-outline-primary" target="_blank">
+           <i class="fas fa-download"></i> <span class="d-none d-sm-inline">Download</span>
+        </a>
         
         <?php if (isPlayable($item['name'])): ?>
             <a href="file-handler.php?id=<?= $fileId ?>" target="_blank" class="btn btn-sm btn-outline-success">

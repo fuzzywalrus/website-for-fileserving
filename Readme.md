@@ -12,7 +12,7 @@ I wrote this so I could create a private web server to share files with a few fr
 - 🔍 Built-in file name search
 - 📄 HTML document preview
 - 🔒 Simple password protection
-- 🛡️ Secure file URLs (obfuscated as `file-handler.php?id=88bed9cf31e56c7fe7f165&download=1`) + traversal protection, double encoding protection, recursively decoding URL Params, and sanitation for URL paths, and validates file names, and moved to HMCA SHA-256, and escaping. 
+- 🛡️ Secure file URLs (obfuscated as `file-handler.php?id=88bed9cf31e56c7fe7f165&download=1`)
 - 🎬 Preview media files directly in browser
 - 🔄 Easy to customize
 
@@ -49,10 +49,6 @@ EXCLUDED_ITEMS=@eaDir,#recycle,.DS_Store,Desktop DB,Desktop DF
 ENVIRONMENT=production
 ```
 
-### Secondary Access
-
-Since I imagine many people want a secondary account class, you can specify another password and directory. 
-
 ### Important Notes:
 - Replace `your_secure_password` with a strong password
 - Generate a strong `ENCRYPTION_KEY` (you can use `openssl rand -hex 16` in terminal)
@@ -77,110 +73,6 @@ On your router you will need to configure the following:
 - Port 443 (HTTPS): Forward to your NAS's internal IP address
 
 #### Domain Name Setup
-
-# Cloudflare (Highly recommended)
- 	
-I highly recommend (Cloudflare Tunnel Easy Setup)[https://www.crosstalksolutions.com/cloudflare-tunnel-easy-setup/] or the youtube version, [Crosstalk solutions: You Need to Learn This! Cloudflare Tunnel Easy Tutorial](https://www.youtube.com/watch?v=ZvIdFs3M5ic). I've slightly updated it as the tunnels has moved into zero trust and now lives under updates.
-
-Cloudflare keeps you from exposing your IP and all of the security features 
-
-Even at the free tier, Cloudflare offers substantial advantages for your Synology directory browser:
-
-- IP Address Obfuscation: Cloudflare masks your home IP address, making it significantly harder for attackers to target your personal network directly.
-- DDoS Protection: Your site gains protection against distributed denial of service attacks that could otherwise overwhelm your home internet connection.
-- Web Application Firewall: Cloudflare automatically blocks common attack patterns and suspicious traffic before it reaches your server.
-- SSL/TLS Encryption: Free, automatically renewed SSL certificates and encryption between visitors and Cloudflare improve security and privacy.
-- Bot Protection: Basic protection against malicious bots that might attempt to scrape content or find vulnerabilities in your application.
-
-# Prerequisites
-
-* **Domain Name:** A registered domain (e.g., `mydomain.com`). *Tip:* Namecheap offers cost-effective domains.
-* **Cloudflare Account:** Sign up at Cloudflare and add your domain.
-* **Synology NAS with Docker:** Running Docker to host the `cloudflared` container.
-* **Basic Networking Knowledge:** Familiarity with Docker, DNS, and Cloudflare's Zero Trust Dashboard.
-
-## 1. Configure Your Domain in Cloudflare
-
-1. **Add Your Domain:**
-   * Log in to Cloudflare and click **Websites** > **Add a Site**.
-   * Enter your domain and select the **Free Plan**.
-2. **Update Nameservers:**
-   * In your domain registrar (e.g., Namecheap), set the nameservers to those provided by Cloudflare.
-   * Wait for DNS propagation and confirmation from Cloudflare.
-
-## 2. Create a Cloudflare Tunnel
-
-1. **Access Tunnel Setup:**
-   * In the Cloudflare you'll need to go to (Zero Trust)[https://one.dash.cloudflare.com/], this might require creating an account navigate to **Networks** > **Tunnel**.
-   * Click **Create a Tunnel**, give it a descriptive name (e.g., `mytunnel`).
-2. **Choose Your Environment:**
-   * Select **Docker** (since you're using a Synology NAS).
-   * Copy the provided Docker command that includes your unique authentication token.
-
-## 3. Set Up the Cloudflared Connector Using Docker
-
-1. **Download the Docker Image:**
-   * Open the Synology Docker application.
-   * Go to **Registry** and search for `cloudflare/cloudflared`; download the `latest` image.
-2. **Create and Configure the Container:**
-   * Launch the image to create a new container.
-   * **Network Mode:** Use the same network as the Docker host.
-   * **Container Name:** For example, `cloudflared-connector`.
-   * **Auto-Restart:** Enable auto-restart.
-   * **Command Configuration:**
-      * Edit the execution command (under Advanced Settings) by pasting a modified command string. Remove extraneous parts so that it resembles:
-
-```
-tunnel run --token <YOUR_TOKEN>
-```
-
-## 4. Add LAN Services to Your Tunnel
-
-1. **Define Public Hostnames:**
-   * In Cloudflare Zero Trust Dashboard, select your tunnel and go to the **Public Hostname** tab.
-   * Click **+ Add a public hostname**.
-2. **Configure Each Service:**
-   * **Synology NAS GUI:**
-      * **Subdomain:** `nas` (resulting in `nas.yourdomain.com`)
-      * **Service Type:** HTTP
-      * **URL:** `http://192.168.x.x:5000`
-   * **PiHole:**
-      * **Subdomain:** `pihole`
-      * **Service Type:** HTTP
-      * **URL:** `http://192.168.x.x/admin`
-   * **Firewall (EdgeRouter):**
-      * **Subdomain:** `firewall`
-      * **Service Type:** HTTPS *Note:* If you encounter certificate errors, open **Additional Application Settings** and enable **No TLS Verify**.
-3. **Save Each Hostname:**
-   * Once saved, accessing these FQDNs from the internet will route you securely to your internal resources via HTTPS (with Cloudflare's certificate).
-
-## 5. Secure Tunnel Access with Cloudflare Zero Trust
-
-1. **Set Up an Authentication Method:**
-   * Navigate to **Settings** > **Authentication** in the Cloudflare Zero Trust Dashboard.
-   * Add the **One-time PIN** login method (or use your preferred SSO).
-2. **Create an Application and Access Policy:**
-   * Go to **Applications** > **Add an application** > **Self-hosted**.
-   * Use a wildcard (`*`) for the subdomain to protect any FQDN in your domain.
-   * **Identity Providers:** Select One-time PIN (or your desired method).
-   * Under **Create additional rules**, add selectors (e.g., specific email addresses or an email domain like `@yourdomain.com`).
-   * Save your policy and application.
-
-## 6. Test Your Setup
-
-1. **Access Your Service:**
-   * Open a browser and go to one of your defined FQDNs (e.g., https://nas.yourdomain.com).
-2. **Authenticate:**
-   * Enter your email address to receive a one-time PIN, then input the PIN to gain access.
-3. **Verify:**
-   * Ensure the resource loads securely, and that non-authorized access is blocked.
-
-
-# More security recommendations
-
-Based on community feedback, it's best to adhere to  defense in depth and principle of least privilege. It's recommended to use an inexpensive server, like a Raspberry Pi 4. Set it up by tunneling to Cloudflare (the Docker solution is low friction), create a web host environment and mount your NAS volume with an account with minimium priviledges. Use this project to server your files. I'll be updating this section as I impliment this myself.
-
-### Not very secure way
 
 1. Open DSM
 2. Go to Control Panel
