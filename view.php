@@ -218,9 +218,9 @@
             // Create file ID
             $fileId = encryptPath($relativePath);
         ?>
-        <a href="file-handler.php?id=<?= $fileId ?>&download=1" class="btn btn-sm btn-outline-primary">
-            <i class="fas fa-download"></i> <span class="d-none d-sm-inline">Download</span>
-        </a>
+<a href="file-handler.php?id=<?= $fileId ?>&download=1" class="btn btn-sm btn-outline-primary" target="_blank">
+    <i class="fas fa-download"></i> <span class="d-none d-sm-inline">Download</span>
+</a>
         
         <?php if (isPlayable($item['name'])): ?>
             <a href="file-handler.php?id=<?= $fileId ?>" target="_blank" class="btn btn-sm btn-outline-success">
