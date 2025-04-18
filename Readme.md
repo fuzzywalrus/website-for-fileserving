@@ -98,26 +98,143 @@ Even at the free tier, Cloudflare offers substantial advantages for your Synolog
 * **Cloudflare Account:** Sign up at Cloudflare and add your domain.
 * **Synology NAS with Docker:** Running Docker to host the `cloudflared` container.
 * **Basic Networking Knowledge:** Familiarity with Docker, DNS, and Cloudflare's Zero Trust Dashboard.
+* **Account on Synology with restricted access** Necessary if you are using a separate web server
 
 ## 1. Configure Your Domain in Cloudflare
 
-1. **Add Your Domain:**
-   * Log in to Cloudflare and click **Websites** > **Add a Site**.
-   * Enter your domain and select the **Free Plan**.
-2. **Update Nameservers:**
-   * In your domain registrar (e.g., Namecheap), set the nameservers to those provided by Cloudflare.
-   * Wait for DNS propagation and confirmation from Cloudflare.
+# Setting Up Cloudflared Connector Using Docker on Raspberry Pi 4
 
-## 2. Create a Cloudflare Tunnel
+This guide shows how to set up a Cloudflared connector using Docker on a Raspberry Pi 4. While these instructions are specific to the Raspberry Pi 4, you can adapt them to other Linux distributions.
 
-1. **Access Tunnel Setup:**
-   * In the Cloudflare you'll need to go to (Zero Trust)[https://one.dash.cloudflare.com/], this might require creating an account navigate to **Networks** > **Tunnel**.
-   * Click **Create a Tunnel**, give it a descriptive name (e.g., `mytunnel`).
-2. **Choose Your Environment:**
-   * Select **Docker** (since you're using a Synology NAS).
-   * Copy the provided Docker command that includes your unique authentication token.
+## 1. Download all the software for your server
 
-## 3. Set Up the Cloudflared Connector Using Docker
+```bash
+sudo apt update
+sudo apt install samba samba-common-bin apache2 php libapache2-mod-php -y
+curl -sSL https://get.docker.com | sh
+```
+
+## 2. Create a backup of your smb.conf
+
+```bash
+sudo cp /etc/samba/smb.conf /etc/samba/smb.conf.backup
+```
+
+## 3. Edit the Samba configuration file
+
+```bash
+sudo nano /etc/samba/smb.conf
+```
+
+Then add to the end of the file:
+
+```
+[www]
+   comment = Apache Web Directory
+   path = /var/www
+   browseable = yes
+   writeable = yes
+   create mask = 0664
+   directory mask = 0775
+   public = no
+```
+
+## 4. Setup a SMB password
+
+This will let you connect to your server via SMB so you can deploy the files. Replace `username` with your user.
+
+```bash
+sudo smbpasswd -a username
+```
+
+## 5. Restart the Samba service and ensure the Apache user (www-data) and your user are in the same group with permissions
+
+Again, replace `username` with your user.
+
+```bash
+sudo systemctl restart smbd
+
+sudo usermod -a -G www-data username
+sudo usermod -a -G username www-data
+sudo chown -R username:www-data /var/www
+sudo chmod -R 775 /var/www
+```
+
+## 6. Configure services to launch on reboot
+
+```bash
+# Check current status
+sudo systemctl status apache2
+
+# Enable Apache2 to start on boot
+sudo systemctl enable apache2
+
+# If it's not already running, start it now
+sudo systemctl start apache2
+
+# Check current status
+sudo systemctl status docker
+
+# Enable Docker to start on boot
+sudo systemctl enable docker
+
+# If it's not already running, start it now
+sudo systemctl start docker
+
+# Check if Apache2 is set to start on boot
+sudo systemctl is-enabled apache2
+
+# Check if Docker is set to start on boot
+sudo systemctl is-enabled docker
+```
+
+## 7. Verify Apache is working properly
+
+```bash
+# Create a test page
+echo "<html><body><h1>My Cloudflare Tunnel Test</h1></body></html>" | sudo tee /var/www/html/index.html
+
+# Test locally
+curl http://localhost
+```
+
+## 8. Configure the tunnel
+
+You will need the token from the Cloudflare Zero Trust panel.
+
+```bash
+docker run -d --name cloudflared --restart always cloudflare/cloudflared:latest tunnel --no-autoupdate run --token [token goes here]
+```
+
+## 9. Check tunnel status
+
+```bash
+# View logs to verify connection
+docker logs cloudflared
+```
+
+## 10. Configure the website!
+
+The Zero Trust panel will tell you if your tunnel is connected correctly. At this point, you should be able to test your webserver from your domain.  
+
+**You'll need to mount your NAS volum**  into the `/var/www/html`
+
+Install the PHP from this  files into the `html` and create the .env file and be sure to set the mounted volume as the BASE_DIR.
+
+
+## 11. Optional: Configure basic firewall
+
+```bash
+sudo apt install ufw -y
+sudo ufw allow ssh
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow samba
+sudo ufw enable
+```
+
+
+### Synology only route (easier but less sucure) 
 
 1. **Download the Docker Image:**
    * Open the Synology Docker application.
@@ -176,11 +293,7 @@ tunnel run --token <YOUR_TOKEN>
    * Ensure the resource loads securely, and that non-authorized access is blocked.
 
 
-# More security recommendations
-
-Based on community feedback, it's best to adhere to  defense in depth and principle of least privilege. It's recommended to use an inexpensive server, like a Raspberry Pi 4. Set it up by tunneling to Cloudflare (the Docker solution is low friction), create a web host environment and mount your NAS volume with an account with minimium priviledges. Use this project to server your files. I'll be updating this section as I impliment this myself.
-
-### Not very secure way
+## Not very secure way
 
 1. Open DSM
 2. Go to Control Panel
