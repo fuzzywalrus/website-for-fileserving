@@ -1,6 +1,6 @@
-# Synology (Or NAS) Web File Browser
+# NAS Web File Browser
 
-Share files with your friends and family! This simple PHP application lets you create your own personal file-sharing website using your Synology NAS (or any web server with PHP support). Create a private file server that's easy to use and (fairly) secure.
+Share files with your friends and family! This simple PHP application lets you create your own personal file-sharing website using your Synology NAS (or any web server with PHP support). Create a private file server that's easy to use and (fairly) secure. Run the HTTP server from a Raspberry Pi to metal gap your NAS.
 
 ![screenshot](https://i.imgur.com/SPCMAOc.png)
 
@@ -18,7 +18,7 @@ I wrote this so I could create a private web server to share files with a few fr
 
 ## Installation
 
-1. Clone or download this repository to your NAS's web directory
+1. Clone or download this repository to your web server
 2. Create a `.env` file in the root directory (see Configuration section below)
 3. Ensure your web server has PHP enabled
 4. Access your site through your domain or IP address
@@ -59,28 +59,19 @@ Since I imagine many people want a secondary account class, you can specify anot
 - Set `BASE_DIR` to the directory you want to share
 - Customize `SITE_TITLE` and `SITE_STATS` to personalize your site
 
-## Synology NAS Setup Guide
 
-### 1. Install Web Station
+# HTTP Server configuration Guide
 
-1. Open DSM (Synology's operating system)
-2. Go to Package Center
-3. Search for and install "Web Station"
-
-### 2. Enable External Access
-
-#### Firewall Rules
+## Firewall Rules
 
 On your router you will need to configure the following:
 
-- Port 80 (HTTP): Forward to your NAS's internal IP address
-- Port 443 (HTTPS): Forward to your NAS's internal IP address
+- Port 80 (HTTP): Forward to your http server's internal IP address
+- Port 443 (HTTPS): Forward to yourhttp's internal IP address
 
-#### Domain Name Setup
-
-# Cloudflare (Highly recommended)
+## Domain Name Setup + Cloudflare (Highly recommended)
  	
-I highly recommend (Cloudflare Tunnel Easy Setup)[https://www.crosstalksolutions.com/cloudflare-tunnel-easy-setup/] or the youtube version, [Crosstalk solutions: You Need to Learn This! Cloudflare Tunnel Easy Tutorial](https://www.youtube.com/watch?v=ZvIdFs3M5ic). I've slightly updated it as the tunnels has moved into zero trust and now lives under updates.
+I originally used (Cloudflare Tunnel Easy Setup)[https://www.crosstalksolutions.com/cloudflare-tunnel-easy-setup/] but I've since changed this to become more agnostic, the [Synology direct hosted](altconfigs.md) still exists. This guide shows how to set up a Cloudflared connector using Docker on a Raspberry Pi 4. While these instructions are specific to the Raspberry Pi 4, you can adapt them to other Linux distributions.
 
 Cloudflare keeps you from exposing your IP and all of the security features 
 
@@ -92,7 +83,7 @@ Even at the free tier, Cloudflare offers substantial advantages for your Synolog
 - SSL/TLS Encryption: Free, automatically renewed SSL certificates and encryption between visitors and Cloudflare improve security and privacy.
 - Bot Protection: Basic protection against malicious bots that might attempt to scrape content or find vulnerabilities in your application.
 
-# Prerequisites
+## Prerequisites
 
 * **Domain Name:** A registered domain (e.g., `mydomain.com`). *Tip:* Namecheap offers cost-effective domains.
 * **Cloudflare Account:** Sign up at Cloudflare and add your domain.
@@ -100,11 +91,19 @@ Even at the free tier, Cloudflare offers substantial advantages for your Synolog
 * **Basic Networking Knowledge:** Familiarity with Docker, DNS, and Cloudflare's Zero Trust Dashboard.
 * **Account on Synology with restricted access** Necessary if you are using a separate web server
 
-## 1. Configure Your Domain in Cloudflare
+## Configure Your Domain in Cloudflare
 
-# Setting Up Cloudflared Connector Using Docker on Raspberry Pi 4
+Sign up for cloudflare if you haven't already. You only need to use the free tier. Once the account has acreated you'll need to then sign into Zero Trust. See (Create a tunnel dashboard docs)[https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/get-started/create-remote-tunnel/] for more details.
 
-This guide shows how to set up a Cloudflared connector using Docker on a Raspberry Pi 4. While these instructions are specific to the Raspberry Pi 4, you can adapt them to other Linux distributions.
+* In Cloudflare Zero Trust Dashboard, select your tunnel and go to the **Networks > Tunnels** tab.
+* Click **+ Cloudflared for the connector type**.
+
+You should see suite of options. For ease of use, we are going to select docker.
+
+## Setting Up Cloudflared Connector Using Docker
+
+If doing this directly on your Synology NAS see [Synology direct hosted](altconfigs.md) although this is somewhat less secure, otherwise proceed here:
+
 
 ## 1. Download all the software for your server
 
@@ -233,6 +232,8 @@ sudo ufw allow samba
 sudo ufw enable
 ```
 
+If your router supports VLAN, I recommend placing your web server computer in it's own VLAN and only giving it minimal access. This continues  defense in depth and principle of least privilege. If your http server gets pnwd, all that'd be exposed is the SMB share with read only privs. 
+
 
 ### Synology only route (easier but less sucure) 
 
@@ -251,63 +252,7 @@ sudo ufw enable
 tunnel run --token <YOUR_TOKEN>
 ```
 
-## 4. Add LAN Services to Your Tunnel
 
-1. **Define Public Hostnames:**
-   * In Cloudflare Zero Trust Dashboard, select your tunnel and go to the **Public Hostname** tab.
-   * Click **+ Add a public hostname**.
-2. **Configure Each Service:**
-   * **Synology NAS GUI:**
-      * **Subdomain:** `nas` (resulting in `nas.yourdomain.com`)
-      * **Service Type:** HTTP
-      * **URL:** `http://192.168.x.x:5000`
-   * **PiHole:**
-      * **Subdomain:** `pihole`
-      * **Service Type:** HTTP
-      * **URL:** `http://192.168.x.x/admin`
-   * **Firewall (EdgeRouter):**
-      * **Subdomain:** `firewall`
-      * **Service Type:** HTTPS *Note:* If you encounter certificate errors, open **Additional Application Settings** and enable **No TLS Verify**.
-3. **Save Each Hostname:**
-   * Once saved, accessing these FQDNs from the internet will route you securely to your internal resources via HTTPS (with Cloudflare's certificate).
-
-## 5. Secure Tunnel Access with Cloudflare Zero Trust
-
-1. **Set Up an Authentication Method:**
-   * Navigate to **Settings** > **Authentication** in the Cloudflare Zero Trust Dashboard.
-   * Add the **One-time PIN** login method (or use your preferred SSO).
-2. **Create an Application and Access Policy:**
-   * Go to **Applications** > **Add an application** > **Self-hosted**.
-   * Use a wildcard (`*`) for the subdomain to protect any FQDN in your domain.
-   * **Identity Providers:** Select One-time PIN (or your desired method).
-   * Under **Create additional rules**, add selectors (e.g., specific email addresses or an email domain like `@yourdomain.com`).
-   * Save your policy and application.
-
-## 6. Test Your Setup
-
-1. **Access Your Service:**
-   * Open a browser and go to one of your defined FQDNs (e.g., https://nas.yourdomain.com).
-2. **Authenticate:**
-   * Enter your email address to receive a one-time PIN, then input the PIN to gain access.
-3. **Verify:**
-   * Ensure the resource loads securely, and that non-authorized access is blocked.
-
-
-## Not very secure way
-
-1. Open DSM
-2. Go to Control Panel
-3. Select External Access
-4. Click on the DDNS tab
-5. Click Add
-
-You can use any DDNS service. [No-IP](https://www.noip.com/) is recommended for its simplicity. Note that the domain credentials will be different from your No-IP account login.
-
-#### SSL Certificate (Recommended)
-
-1. In Control Panel → Security → Certificate 
-2. Set up Let's Encrypt for free HTTPS
-3. You'll need to be able to access your website from your domain name
 
 ### 3. Link Your Content Directory
 
