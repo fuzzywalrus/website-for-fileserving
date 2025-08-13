@@ -13,9 +13,22 @@ I wrote this so I could create a private web server to share files with a few fr
 - ✨ Clean, responsive Bootstrap UI
 - 🔍 Built-in file name search
 - 📄 HTML document preview
-- 🔒 Simple password protection
-- 🛡️ Secure file URLs (obfuscated as `file-handler.php?id=88bed9cf31e56c7fe7f165&download=1`) + traversal protection, double encoding protection, recursively decoding URL Params, and sanitation for URL paths, and validates file names, and moved to HMCA SHA-256, and escaping. 
+- 🔒 **Enhanced Authentication System**
+  - Password protection with brute force protection
+  - Progressive rate limiting (30s → 2min → 5min → 15min → 1hr → 24hr)
+  - "Remember Me" functionality with 30-day persistent login
+  - Session timeout protection and IP validation
+  - CSRF protection and secure session management
+- 🛡️ **Commercial-Grade Security**
+  - File URLs protected with AES-256-GCM encryption
+  - Secure encrypted cookies for persistent authentication
+  - Path traversal protection and input sanitization
+  - Comprehensive security logging and monitoring
 - 🎬 Preview media files directly in browser
+- ⏱️ **Flexible Session Management**
+  - 24-hour sessions for regular logins
+  - 30-day extended sessions with "Remember Me"
+  - Automatic session cleanup and token management
 - 🔄 Easy to customize
 - 🔑 Instructions for CloudFlare Tunnel for reverse proxy protection
 - 💾 Apache and NGNIX agnostic, use your preferred hosting
@@ -59,9 +72,59 @@ Since I imagine many people want a secondary account class, you can specify anot
 
 ### Important Notes:
 - Replace `your_secure_password` with a strong password
-- Generate a strong `ENCRYPTION_KEY` (you can use `openssl rand -hex 16` in terminal)
+- **Generate a strong `ENCRYPTION_KEY`**: Use `openssl rand -hex 32` to create a secure 64-character hex string
+  - This key is used for AES-256-GCM encryption of file URLs for enhanced security
+  - Example: `openssl rand -hex 32` generates something like: `a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456`
 - Set `BASE_DIR` to the directory you want to share
 - Customize `SITE_TITLE` and `SITE_STATS` to personalize your site
+
+## Authentication & Security Features
+
+### Enhanced Login System
+The application now includes enterprise-grade authentication with multiple security layers:
+
+**Brute Force Protection:**
+- Progressive rate limiting with escalating timeouts
+- Automatic IP-based lockouts after failed attempts
+- Secure logging of all authentication events
+- Protection against automated attack tools
+
+**Remember Me Functionality:**
+- Optional 30-day persistent login via encrypted cookies
+- Secure token-based authentication
+- Automatic re-authentication on return visits
+- One-click logout clears all authentication data
+
+**Session Security:**
+- **Regular Sessions**: 24-hour automatic timeout
+- **Extended Sessions**: 30-day timeout with "Remember Me"
+- Session regeneration prevents fixation attacks
+- IP validation detects potential session hijacking
+- CSRF protection on all forms
+
+### Security Implementation Details
+
+**Rate Limiting Schedule:**
+```
+Attempt 1-4: Warning messages (allowed within 30 seconds)
+Attempt 5: 30-second lockout
+Attempt 6: 2-minute lockout
+Attempt 7: 5-minute lockout
+Attempt 8: 15-minute lockout
+Attempt 9+: 1-hour to 24-hour lockout
+```
+
+**Cookie Security:**
+- All authentication cookies are encrypted using AES-256-GCM
+- HttpOnly and Secure flags prevent client-side access
+- SameSite=Strict prevents cross-site request forgery
+- Automatic expiration and cleanup of old tokens
+
+**Logging & Monitoring:**
+- All login attempts logged with IP addresses and timestamps
+- Failed authentication attempts tracked and reported
+- Session security events recorded for audit trails
+- Rate limit violations logged for security analysis
 
 
 # HTTP Server configuration Guide
@@ -277,18 +340,90 @@ Save and exit (press Esc, then type `:wq` and press Enter)
 
 ## Security Considerations
 
-- Choose a strong password and encryption key
-- Regularly update your PHP version
-- Be careful about what content you share
-- Place your HTTP server on a VLAN 
+### Authentication Security
+- **Strong Passwords**: Use complex passwords that are difficult to guess or brute force
+- **Encryption Key**: Generate using `openssl rand -hex 32` for maximum AES-256 security
+- **Remember Me Usage**: Only enable on trusted devices - extends session to 30 days
+- **Regular Logout**: Manually logout on shared computers to clear all authentication data
+- **Monitor Logs**: Check server logs for suspicious login patterns or rate limit violations
+
+### System Security
+- **File URL Protection**: File paths are encrypted using AES-256-GCM, making enumeration impossible
+- **Session Management**: Extended sessions are automatically secured with encrypted persistent cookies
+- **CSRF Protection**: All forms include anti-forgery tokens to prevent cross-site attacks
+- **IP Validation**: Optional session IP checking helps detect potential session hijacking
+- **Automatic Cleanup**: Expired sessions and tokens are automatically removed
+
+### Infrastructure Security
+- **Regular Updates**: Keep PHP version current to get the latest security patches
+- **Content Awareness**: Only share files you're comfortable with authorized users accessing
+- **Network Isolation**: Place HTTP server on separate VLAN for defense in depth
+- **HTTPS**: Use SSL/TLS encryption (via Cloudflare) for all traffic to protect credentials
+- **Log Monitoring**: Regular review of authentication logs helps identify security issues
+
+### Best Practices
+- **Use "Remember Me" only on personal devices** - avoid on public computers
+- **Regular password changes** if you suspect compromise
+- **Monitor failed login attempts** in server logs
+- **Clear browser data** when finished using shared computers
+- **Keep encryption key secure** - treat it like a master password 
 
 ## Troubleshooting
 
+### General Issues
 - If files don't display, check file permissions
 - Ensure PHP has read access to your content directory
 - Check web server logs for any errors
 - Verify that the .env file is properly formatted
 - Make sure the `mount --bind` command was successful
+
+### Authentication Issues
+
+**"Too many failed login attempts" Error:**
+- You get 4 attempts within the first 30 seconds before lockout begins
+- Wait for the specified time period before trying again
+- Check server logs to see if your IP is being rate limited
+- Ensure you're using the correct password
+- Clear browser cookies and try again
+
+**"Remember Me" Not Working:**
+- Verify cookies are enabled in your browser
+- Check that your encryption key is properly set in .env
+- Ensure the server time is correct (affects cookie expiration)
+- Try clearing browser cookies and logging in again
+
+**Session Expired Messages:**
+- Regular sessions expire after 24 hours
+- Extended sessions (with "Remember Me") expire after 30 days
+- Session may be invalidated if your IP address changes
+- Manual logout clears all session data
+
+**CSRF Token Errors:**
+- Clear browser cookies and refresh the page
+- Ensure JavaScript is enabled
+- Check that the session hasn't expired
+- Try logging out and back in
+
+**Auto-login Not Working:**
+- Verify the "Remember Me" checkbox was checked during login
+- Check browser cookie settings allow persistent cookies
+- Ensure the domain matches between login and access
+- Server logs will show if remember me tokens are being validated
+
+### Log Analysis
+Check your web server error logs for detailed information:
+```bash
+# Apache logs
+tail -f /var/log/apache2/error.log
+
+# PHP logs
+tail -f /var/log/php_errors.log
+
+# Look for authentication events like:
+# "Successful login from IP: x.x.x.x (User type: primary)"
+# "Failed login attempt from IP: x.x.x.x (Attempt 3)"
+# "Blocked login attempt from IP: x.x.x.x"
+```
 
 ## License
 

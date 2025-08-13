@@ -16,8 +16,9 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h2 class="mb-0"><?= htmlspecialchars($siteTitle) ?></h2>
                 
-                <!-- Search Form -->
-                <form method="get" class="d-flex">
+                <div class="d-flex align-items-center gap-3">
+                    <!-- Search Form -->
+                    <form method="get" class="d-flex">
                     <div class="input-group">
                         <input type="text" name="search" class="form-control" placeholder="Search files..." 
                                value="<?= htmlspecialchars($searchTerm ?? '') ?>">
@@ -30,7 +31,13 @@
                             </a>
                         <?php endif; ?>
                     </div>
-                </form>
+                    </form>
+                    
+                    <!-- Logout Button -->
+                    <a href="?logout=1" class="btn btn-outline-danger btn-sm" title="Logout">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
+                </div>
             </div>
             <div class="card-body">
                 <?php if ($isSearchRequest): ?>
@@ -188,6 +195,15 @@
             </div>
             <div class="card-footer text-muted text-center">
                 <?= htmlspecialchars($siteStats) ?>
+                <?php if (isset($_SESSION['extended_session']) && $_SESSION['extended_session']): ?>
+                    <div class="small mt-1">
+                        <i class="fas fa-clock me-1"></i>Extended session active (30 days)
+                    </div>
+                <?php else: ?>
+                    <div class="small mt-1">
+                        <i class="fas fa-timer me-1"></i>Session expires in 24 hours
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
