@@ -1,12 +1,12 @@
-# NAS Web File Browser
+# A database-free (and JS-free) Web File Browser, turn any computer or NAS into a file server!
 
-Share files with your friends and family! This simple PHP application lets you create your own personal file-sharing website using your Synology NAS (or any web server with PHP support). Create a private file server that's easy to use and (fairly) secure. Run the HTTP server from a Raspberry Pi to metal gap your NAS.
+Share files with your friends and family! This simple PHP application lets you create your own personal file-sharing website using your Synology NAS (or any web server with PHP support). Create a private file server that's easy to use and (fairly) secure. Run the HTTP server from a Raspberry Pi to metal gap your NAS. THis is a database free setup that uses a `.env` file for configuration which removes the headache of needing to set up a database and protecting it.
 
 This allows Synology-like File Station on any NAS, and allows for more customized experience and less exposed solution for Synology users. Host your HTTP server on a separate computer or virtual machine or however you like.
 
 ![screenshot](https://i.imgur.com/SPCMAOc.png)
 
-I wrote this so I could create a private web server to share files with a few friends and family members. If you have FiOS then you're certainly capable of hosting your own accessible-over-http file server.
+I wrote this so I could create a private web server to share files with a few friends and family members. If you have fiber then you're certainly capable of hosting your own accessible-over-http file server.
 
 ## Features
 
