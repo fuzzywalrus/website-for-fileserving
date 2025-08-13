@@ -41,7 +41,26 @@ I wrote this so I could create a private web server to share files with a few fr
 1. Clone or download this repository to your web server
 2. Create a `.env` file in the root directory (see Configuration section below)
 3. Ensure your web server has PHP enabled
-4. Access your site through your domain or IP address
+4. **Secure your `.env` file** (see Web Server Security section below)
+5. Access your site through your domain or IP address
+
+### Web Server Security
+
+**CRITICAL**: Protect your `.env` file from web access to prevent exposure of passwords and encryption keys.
+
+**For Apache servers**, create or add to `.htaccess`:
+```apache
+<Files ".env">
+  Require all denied
+</Files>
+```
+
+**For Nginx servers**, add to your site configuration:
+```nginx
+location ~ /\.env {
+  deny all;
+}
+```
 
 ## Configuration
 

@@ -410,56 +410,72 @@ function getClientIP() {
 }
 
 /**
- * Check if an IP address is currently rate limited
+ * Check if an IP address is currently rate limited (IP-based, session-independent)
  * 
  * @param string $ip The IP address to check
  * @return array Array with 'blocked' status and 'remaining_time' in seconds
  */
 function checkRateLimit($ip) {
-    if (!isset($_SESSION['rate_limits'])) {
-        $_SESSION['rate_limits'] = [];
+    $rateLimitFile = sys_get_temp_dir() . '/rate_limits.json';
+    $currentTime = time();
+    $rateLimits = [];
+    
+    // Load existing rate limits from file
+    if (file_exists($rateLimitFile)) {
+        $data = file_get_contents($rateLimitFile);
+        if ($data !== false) {
+            $rateLimits = json_decode($data, true) ?: [];
+        }
     }
     
-    $currentTime = time();
-    $rateLimits = &$_SESSION['rate_limits'];
-    
-    // Clean up expired entries
+    // Clean up expired entries (older than 24 hours)
+    $cleaned = false;
     foreach ($rateLimits as $limitedIp => $data) {
-        if ($currentTime > $data['unblock_time']) {
+        if ($currentTime > ($data['unblock_time'] ?? 0) && 
+            $currentTime > ($data['first_attempt'] ?? 0) + 86400) {
             unset($rateLimits[$limitedIp]);
+            $cleaned = true;
         }
+    }
+    
+    // Save cleaned data if we removed entries
+    if ($cleaned) {
+        file_put_contents($rateLimitFile, json_encode($rateLimits), LOCK_EX);
     }
     
     // Check if IP is currently blocked
     if (isset($rateLimits[$ip])) {
-        $remainingTime = $rateLimits[$ip]['unblock_time'] - $currentTime;
+        $remainingTime = ($rateLimits[$ip]['unblock_time'] ?? 0) - $currentTime;
         if ($remainingTime > 0) {
             return [
                 'blocked' => true,
                 'remaining_time' => $remainingTime,
-                'attempts' => $rateLimits[$ip]['attempts']
+                'attempts' => $rateLimits[$ip]['attempts'] ?? 0
             ];
-        } else {
-            unset($rateLimits[$ip]);
         }
     }
     
-    return ['blocked' => false, 'remaining_time' => 0, 'attempts' => 0];
+    return ['blocked' => false, 'remaining_time' => 0, 'attempts' => $rateLimits[$ip]['attempts'] ?? 0];
 }
 
 /**
- * Record a failed login attempt and apply rate limiting
+ * Record a failed login attempt and apply rate limiting (IP-based, session-independent)
  * 
  * @param string $ip The IP address that failed authentication
  * @return array Updated rate limit status
  */
 function recordFailedAttempt($ip) {
-    if (!isset($_SESSION['rate_limits'])) {
-        $_SESSION['rate_limits'] = [];
-    }
-    
+    $rateLimitFile = sys_get_temp_dir() . '/rate_limits.json';
     $currentTime = time();
-    $rateLimits = &$_SESSION['rate_limits'];
+    $rateLimits = [];
+    
+    // Load existing rate limits from file
+    if (file_exists($rateLimitFile)) {
+        $data = file_get_contents($rateLimitFile);
+        if ($data !== false) {
+            $rateLimits = json_decode($data, true) ?: [];
+        }
+    }
     
     // Initialize or update the attempt counter
     if (!isset($rateLimits[$ip])) {
@@ -483,6 +499,9 @@ function recordFailedAttempt($ip) {
         $rateLimits[$ip]['unblock_time'] = $currentTime + $blockDuration;
     }
     
+    // Save updated rate limits to file
+    file_put_contents($rateLimitFile, json_encode($rateLimits), LOCK_EX);
+    
     return [
         'blocked' => $blockDuration > 0,
         'remaining_time' => $blockDuration,
@@ -491,13 +510,27 @@ function recordFailedAttempt($ip) {
 }
 
 /**
- * Clear failed attempts for an IP (called on successful login)
+ * Clear failed attempts for an IP (called on successful login) - IP-based, session-independent
  * 
  * @param string $ip The IP address to clear
  */
 function clearFailedAttempts($ip) {
-    if (isset($_SESSION['rate_limits'][$ip])) {
-        unset($_SESSION['rate_limits'][$ip]);
+    $rateLimitFile = sys_get_temp_dir() . '/rate_limits.json';
+    $rateLimits = [];
+    
+    // Load existing rate limits from file
+    if (file_exists($rateLimitFile)) {
+        $data = file_get_contents($rateLimitFile);
+        if ($data !== false) {
+            $rateLimits = json_decode($data, true) ?: [];
+        }
+    }
+    
+    // Remove the IP from rate limits
+    if (isset($rateLimits[$ip])) {
+        unset($rateLimits[$ip]);
+        // Save updated rate limits to file
+        file_put_contents($rateLimitFile, json_encode($rateLimits), LOCK_EX);
     }
 }
 
@@ -549,20 +582,20 @@ function regenerateSession() {
     }
 }
 
+
 /**
  * Set secure session parameters
  */
 function setSecureSessionParams($extended = false) {
-    // Set secure session configuration
     ini_set('session.cookie_httponly', 1);
     ini_set('session.use_only_cookies', 1);
-    ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
+    // Force secure via proxy-aware check
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    ini_set('session.cookie_secure', $isHttps ? 1 : 0);
     ini_set('session.cookie_samesite', 'Strict');
-    
-    // Set session timeout based on remember me preference
-    $sessionTimeout = $extended ? 2592000 : 86400; // 30 days vs 24 hours
-    ini_set('session.gc_maxlifetime', $sessionTimeout);
-    ini_set('session.cookie_lifetime', $sessionTimeout);
+    ini_set('session.gc_maxlifetime', $extended ? 2592000 : 86400);
+    ini_set('session.cookie_lifetime', $extended ? 2592000 : 86400);
 }
 
 /**
@@ -593,14 +626,23 @@ function setRememberCookie($token, $isSecondaryUser = false, $expiry = null) {
         'ip' => getClientIP()
     ];
     
-    // Encrypt the cookie data for security
+    // Encrypt the cookie data for security (with 30-day TTL)
     $encryptedData = encryptCookieData(json_encode($cookieData));
     
-    // Set cookie with secure parameters
-    $secure = isset($_SERVER['HTTPS']);
-    setcookie('remember_auth', $encryptedData, $expiry, '/', '', $secure, true);
+    // Set cookie with secure parameters using options array
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    setcookie('remember_auth', $encryptedData, [
+        'expires'  => $expiry,
+        'path'     => '/',
+        'secure'   => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Strict',
+    ]);
     
-    // Store token in session for validation
+    // LIMITATION: Store token in session for validation
+    // NOTE: This is still fragile - tokens will be lost when session expires
+    // TODO: Implement proper persistent token store (database/file) for production use
     $_SESSION['remember_tokens'][$token] = [
         'created' => time(),
         'is_secondary' => $isSecondaryUser,
@@ -677,8 +719,9 @@ function checkRememberCookie() {
  */
 function clearRememberCookie() {
     if (isset($_COOKIE['remember_auth'])) {
-        $secure = isset($_SERVER['HTTPS']);
-        setcookie('remember_auth', '', time() - 3600, '/', '', $secure, true);
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+        setcookie('remember_auth', '', time() - 3600, '/', '', $isHttps, true);
         unset($_COOKIE['remember_auth']);
     }
 }
@@ -695,25 +738,126 @@ function removeRememberToken($token) {
 }
 
 /**
- * Encrypt cookie data using the same encryption as file paths
+ * Encrypt cookie data with 30-day TTL (not session-bound like file paths)
  * 
  * @param string $data The data to encrypt
  * @return string|false The encrypted data or false on failure
  */
 function encryptCookieData($data) {
-    // Reuse the existing encryption function
-    return encryptPath($data);
+    global $encryptionKey;
+    
+    try {
+        // Create payload without session binding for cookie persistence
+        $payload = json_encode([
+            'data' => $data,
+            'expiry' => time() + (30 * 24 * 60 * 60), // 30 days
+            'created' => time(),
+            'purpose' => 'remember_cookie'
+        ]);
+        
+        // Ensure we have a proper 32-byte key for AES-256
+        $key = hash('sha256', $encryptionKey, true);
+        
+        // Generate a random 12-byte nonce (96 bits - recommended for GCM)
+        $nonce = random_bytes(12);
+        
+        // Use different AAD for cookies vs file tokens
+        $aad = 'remember_me_cookie';
+        
+        // Encrypt the payload using AES-256-GCM
+        $encrypted = openssl_encrypt(
+            $payload,
+            'aes-256-gcm',
+            $key,
+            OPENSSL_RAW_DATA,
+            $nonce,
+            $tag,
+            $aad
+        );
+        
+        if ($encrypted === false) {
+            error_log('Cookie encryption failed');
+            return false;
+        }
+        
+        // Combine nonce + tag + encrypted data and encode as base64url (URL-safe)
+        $combined = $nonce . $tag . $encrypted;
+        return base64url_encode($combined);
+        
+    } catch (Exception $e) {
+        error_log('Cookie encryption error: ' . $e->getMessage());
+        return false;
+    }
 }
 
 /**
- * Decrypt cookie data
+ * Decrypt cookie data (not session-bound)
  * 
  * @param string $encryptedData The encrypted data
  * @return string|false The decrypted data or false on failure
  */
 function decryptCookieData($encryptedData) {
-    // Reuse the existing decryption function
-    return decryptPath($encryptedData);
+    global $encryptionKey;
+    
+    try {
+        // Decode from base64url
+        $combined = base64url_decode($encryptedData);
+        if ($combined === false || strlen($combined) < 28) { // 12 + 16 = minimum size
+            return false;
+        }
+        
+        // Extract components: nonce (12 bytes) + tag (16 bytes) + encrypted data
+        $nonce = substr($combined, 0, 12);
+        $tag = substr($combined, 12, 16);
+        $encrypted = substr($combined, 28);
+        
+        // Ensure we have the same 32-byte key
+        $key = hash('sha256', $encryptionKey, true);
+        
+        // Use the same AAD as encryption
+        $aad = 'remember_me_cookie';
+        
+        // Decrypt using AES-256-GCM
+        $decrypted = openssl_decrypt(
+            $encrypted,
+            'aes-256-gcm',
+            $key,
+            OPENSSL_RAW_DATA,
+            $nonce,
+            $tag,
+            $aad
+        );
+        
+        if ($decrypted === false) {
+            error_log('Cookie decryption failed');
+            return false;
+        }
+        
+        // Parse the JSON payload
+        $payload = json_decode($decrypted, true);
+        if (!$payload || !isset($payload['data'], $payload['expiry'], $payload['purpose'])) {
+            error_log('Invalid cookie payload structure');
+            return false;
+        }
+        
+        // Check purpose
+        if ($payload['purpose'] !== 'remember_cookie') {
+            error_log('Invalid cookie purpose');
+            return false;
+        }
+        
+        // Check expiry
+        if (time() > $payload['expiry']) {
+            error_log('Remember me cookie expired (created: ' . date('Y-m-d H:i:s', $payload['created']) . ')');
+            return false;
+        }
+        
+        return $payload['data'];
+        
+    } catch (Exception $e) {
+        error_log('Cookie decryption error: ' . $e->getMessage());
+        return false;
+    }
 }
 
 /**

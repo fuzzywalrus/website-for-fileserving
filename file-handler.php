@@ -239,12 +239,16 @@ if ($isPartial) {
 // Set the content type header
 header('Content-Type: ' . $contentType);
 
-// Set content disposition based on download mode
-if ($forceDownload) {
-    header('Content-Disposition: attachment; filename="' . basename($realFilePath) . '"');
-} else {
-    header('Content-Disposition: inline; filename="' . basename($realFilePath) . '"');
-}
+// Set content disposition with RFC 5987 compliant filename handling
+$filename = basename($realFilePath);
+$disposition = $forceDownload ? 'attachment' : 'inline';
+
+// Escape quotes and backslashes for the quoted filename parameter
+$quoted = str_replace(['\\','"'], ['\\\\','\\"'], $filename);
+
+// Create RFC 5987 compliant Content-Disposition header with UTF-8 filename support
+$cd = $disposition . '; filename="' . $quoted . '"; filename*=UTF-8\'\'' . rawurlencode($filename);
+header('Content-Disposition: ' . $cd);
 
 // Add additional headers for better transfer handling
 header('Accept-Ranges: bytes');
