@@ -658,3 +658,112 @@ function decryptCookieData($encryptedData) {
     // Reuse the existing decryption function
     return decryptPath($encryptedData);
 }
+
+/**
+ * Input validation functions for security
+ */
+
+/**
+ * Validate input length and sanitize
+ * 
+ * @param string $input The input to validate
+ * @param int $maxLength Maximum allowed length
+ * @param string $fieldName Field name for error logging
+ * @return string|false Sanitized input or false if invalid
+ */
+function validateInput($input, $maxLength, $fieldName = 'input') {
+    if (!is_string($input)) {
+        error_log("Invalid input type for field: {$fieldName}");
+        return false;
+    }
+    
+    // Check length
+    if (strlen($input) > $maxLength) {
+        error_log("Input too long for field: {$fieldName} (length: " . strlen($input) . ", max: {$maxLength})");
+        return false;
+    }
+    
+    // Basic sanitization - remove null bytes and control characters
+    $sanitized = str_replace("\0", '', $input);
+    $sanitized = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $sanitized);
+    
+    return $sanitized;
+}
+
+/**
+ * Validate password input
+ * 
+ * @param string $password The password to validate
+ * @return string|false Validated password or false if invalid
+ */
+function validatePassword($password) {
+    // Allow generous 1000 characters for passwords (supports long passphrases)
+    return validateInput($password, 1000, 'password');
+}
+
+/**
+ * Validate search query input
+ * 
+ * @param string $query The search query to validate
+ * @return string|false Validated query or false if invalid
+ */
+function validateSearchQuery($query) {
+    // Allow 500 characters for search queries
+    return validateInput($query, 500, 'search_query');
+}
+
+/**
+ * Validate file path input
+ * 
+ * @param string $path The file path to validate
+ * @return string|false Validated path or false if invalid
+ */
+function validateFilePath($path) {
+    // Allow 2000 characters for file paths (handles deep directory structures)
+    return validateInput($path, 2000, 'file_path');
+}
+
+/**
+ * Validate CSRF token input
+ * 
+ * @param string $token The CSRF token to validate
+ * @return string|false Validated token or false if invalid
+ */
+function validateCSRFToken($token) {
+    // CSRF tokens should be exactly 64 characters (hex)
+    if (!is_string($token) || strlen($token) !== 64) {
+        error_log("Invalid CSRF token length: " . strlen($token ?? ''));
+        return false;
+    }
+    
+    // Check if it's valid hex
+    if (!ctype_xdigit($token)) {
+        error_log("Invalid CSRF token format (not hex)");
+        return false;
+    }
+    
+    return $token;
+}
+
+/**
+ * Validate encrypted ID input
+ * 
+ * @param string $encryptedId The encrypted ID to validate
+ * @return string|false Validated ID or false if invalid
+ */
+function validateEncryptedId($encryptedId) {
+    // Allow 2000 characters for encrypted IDs (base64url encoded)
+    $validated = validateInput($encryptedId, 2000, 'encrypted_id');
+    
+    if ($validated === false) {
+        return false;
+    }
+    
+    // Additional validation for base64url format
+    if (!preg_match('/^[A-Za-z0-9_-]+$/', $validated)) {
+        error_log("Invalid encrypted ID format (not base64url)");
+        return false;
+    }
+    
+    return $validated;
+}

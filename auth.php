@@ -84,13 +84,19 @@ if (!isset($_SESSION['csrf_token'])) {
 
 // Handle login form submission
 if (isset($_POST['password'])) {
-    // Check CSRF token
-    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+    // Validate CSRF token
+    $csrfToken = validateCSRFToken($_POST['csrf_token'] ?? '');
+    if (!$csrfToken || !hash_equals($_SESSION['csrf_token'], $csrfToken)) {
         $loginError = "Security error: Invalid form submission. Please try again.";
         error_log("CSRF token mismatch from IP: " . getClientIP());
     } else {
+        // Validate password input
+        $submittedPassword = validatePassword($_POST['password'] ?? '');
+        if ($submittedPassword === false) {
+            $loginError = "Invalid input: Password format is invalid.";
+            error_log("Invalid password input from IP: " . getClientIP());
+        } else {
     $clientIP = getClientIP();
-    $submittedPassword = $_POST['password'];
     
     // Check rate limiting before processing login
     $rateLimitStatus = checkRateLimit($clientIP);
@@ -179,6 +185,7 @@ if (isset($_POST['password'])) {
             usleep(rand(100000, 500000)); // 0.1-0.5 second random delay
         }
     }
+        } // Close password validation else block
     } // Close the CSRF check else block
 }
 
@@ -240,7 +247,7 @@ function displayLoginForm($error = null) {
                                     <label for="password" class="form-label">Password</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter password" required>
+                                        <input type="password" class="form-control" id="password" name="password" placeholder="Enter password" maxlength="1000" required>
                                     </div>
                                 </div>
                                 <div class="mb-3 form-check">

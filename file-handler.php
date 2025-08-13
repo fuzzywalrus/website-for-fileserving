@@ -40,8 +40,15 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
 
 // If we have a file ID, decode it
 if (isset($_GET['id']) && !empty($_GET['id'])) {
+    // Validate encrypted ID format first
+    $encryptedId = validateEncryptedId($_GET['id']);
+    if ($encryptedId === false) {
+        header('HTTP/1.1 400 Bad Request');
+        exit('Invalid file ID format');
+    }
+    
     // Get the file path from the hash
-    $decrypted = decryptPath($_GET['id']);
+    $decrypted = decryptPath($encryptedId);
     
     if ($decrypted !== false) {
         $_GET['path'] = $decrypted;
@@ -59,6 +66,14 @@ if (empty($filePath)) {
     header('HTTP/1.1 400 Bad Request');
     exit('File path not specified');
 }
+
+// Validate file path input
+$validatedPath = validateFilePath($filePath);
+if ($validatedPath === false) {
+    header('HTTP/1.1 400 Bad Request');
+    exit('Invalid file path format');
+}
+$filePath = $validatedPath;
 
 // Add extra protection against path traversal
 $filePath = secureUrlDecode($filePath);

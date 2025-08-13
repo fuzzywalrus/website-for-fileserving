@@ -21,7 +21,7 @@
                     <form method="get" class="d-flex">
                     <div class="input-group">
                         <input type="text" name="search" class="form-control" placeholder="Search files..." 
-                               value="<?= htmlspecialchars($searchTerm ?? '') ?>">
+                               value="<?= htmlspecialchars($searchTerm ?? '') ?>" maxlength="500">
                         <button type="submit" class="btn btn-primary">
                             <i class="fas fa-search"></i>
                         </button>
