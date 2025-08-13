@@ -217,29 +217,48 @@ function isPlayable($file) {
 }
 
 /**
- * Securely encrypt a file path using AES-256-GCM
+ * Securely encrypt a file path with session binding and TTL using AES-256-GCM
  * 
  * @param string $path The file path to encrypt
+ * @param int $ttlMinutes TTL in minutes (default: 24 hours)
  * @return string|false Base64 encoded encrypted data or false on failure
  */
-function encryptPath($path) {
+function encryptPath($path, $ttlMinutes = 1440) { // 24 hours default
     global $encryptionKey;
     
     try {
+        // Create payload with path, session ID, user info, and expiry
+        $sessionId = session_id();
+        $userId = $_SESSION['is_secondary_user'] ?? false ? 'secondary' : 'primary';
+        $expiry = time() + ($ttlMinutes * 60);
+        
+        $payload = json_encode([
+            'path' => $path,
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'expiry' => $expiry,
+            'created' => time(),
+            'ip' => getClientIP()
+        ]);
+        
         // Ensure we have a proper 32-byte key for AES-256
         $key = hash('sha256', $encryptionKey, true);
         
         // Generate a random 12-byte nonce (96 bits - recommended for GCM)
         $nonce = random_bytes(12);
         
-        // Encrypt the path using AES-256-GCM
+        // Use additional authenticated data (AAD) for extra security
+        $aad = 'file_access_token';
+        
+        // Encrypt the payload using AES-256-GCM
         $encrypted = openssl_encrypt(
-            $path,
+            $payload,
             'aes-256-gcm',
             $key,
             OPENSSL_RAW_DATA,
             $nonce,
-            $tag
+            $tag,
+            $aad
         );
         
         if ($encrypted === false) {
@@ -258,7 +277,7 @@ function encryptPath($path) {
 }
 
 /**
- * Securely decrypt a file path using AES-256-GCM
+ * Securely decrypt a file path with session binding and TTL validation using AES-256-GCM
  * 
  * @param string $encryptedData Base64 encoded encrypted data
  * @return string|false The decrypted file path or false on failure
@@ -281,6 +300,9 @@ function decryptPath($encryptedData) {
         // Ensure we have the same 32-byte key
         $key = hash('sha256', $encryptionKey, true);
         
+        // Use the same additional authenticated data (AAD)
+        $aad = 'file_access_token';
+        
         // Decrypt using AES-256-GCM
         $decrypted = openssl_decrypt(
             $encrypted,
@@ -288,7 +310,8 @@ function decryptPath($encryptedData) {
             $key,
             OPENSSL_RAW_DATA,
             $nonce,
-            $tag
+            $tag,
+            $aad
         );
         
         if ($decrypted === false) {
@@ -296,7 +319,41 @@ function decryptPath($encryptedData) {
             return false;
         }
         
-        return $decrypted;
+        // Parse the JSON payload
+        $payload = json_decode($decrypted, true);
+        if (!$payload || !isset($payload['path'], $payload['session_id'], $payload['user_id'], $payload['expiry'])) {
+            error_log('Invalid payload structure in decrypted data');
+            return false;
+        }
+        
+        // Check expiry
+        if (time() > $payload['expiry']) {
+            error_log('File access token expired (created: ' . date('Y-m-d H:i:s', $payload['created']) . ')');
+            return false;
+        }
+        
+        // Validate session ID
+        if ($payload['session_id'] !== session_id()) {
+            error_log('Session ID mismatch in file access token');
+            return false;
+        }
+        
+        // Validate user type
+        $currentUserId = $_SESSION['is_secondary_user'] ?? false ? 'secondary' : 'primary';
+        if ($payload['user_id'] !== $currentUserId) {
+            error_log('User ID mismatch in file access token');
+            return false;
+        }
+        
+        // Optional: Validate IP (can be disabled if too strict)
+        $currentIP = getClientIP();
+        if (isset($payload['ip']) && $payload['ip'] !== $currentIP) {
+            error_log("IP mismatch in file access token. Original: {$payload['ip']}, Current: {$currentIP}");
+            // Don't fail on IP mismatch for better user experience, just log it
+            // return false;
+        }
+        
+        return $payload['path'];
         
     } catch (Exception $e) {
         error_log('Decryption error: ' . $e->getMessage());

@@ -20,10 +20,11 @@ I wrote this so I could create a private web server to share files with a few fr
   - Session timeout protection and IP validation
   - CSRF protection and secure session management
 - 🛡️ **Commercial-Grade Security**
-  - File URLs protected with AES-256-GCM encryption
+  - File URLs protected with AES-256-GCM encryption + session binding
+  - CSRF protection for file downloads with TTL tokens
   - Secure encrypted cookies for persistent authentication
-  - Path traversal protection and input sanitization
-  - Security logging and monitoring
+  - Path traversal protection and comprehensive input validation
+  - Multi-layer security logging and monitoring
 - 🎬 Preview media files directly in browser
 - ⏱️ **Flexible Session Management**
   - 24-hour sessions for regular logins
@@ -118,6 +119,13 @@ Attempt 8: 15-minute lockout
 Attempt 9+: 1-hour to 24-hour lockout
 ```
 
+**File Access Security:**
+- Session-bound encrypted file tokens prevent CSRF attacks
+- 24-hour TTL on file access tokens (allows large file downloads)
+- Origin/Referer header validation blocks cross-site requests
+- Multi-factor token validation (session + user + expiry)
+- Anti-caching headers prevent shared proxy/CDN exposure
+
 **Cookie Security:**
 - All authentication cookies are encrypted using AES-256-GCM
 - HttpOnly and Secure flags prevent client-side access
@@ -129,6 +137,8 @@ Attempt 9+: 1-hour to 24-hour lockout
 - Failed authentication attempts tracked and reported
 - Session security events recorded for audit trails
 - Rate limit violations logged for security analysis
+- CSRF attack attempts detected and logged
+- File access token validation events tracked
 
 
 # HTTP Server configuration Guide
@@ -352,11 +362,13 @@ Save and exit (press Esc, then type `:wq` and press Enter)
 - **Monitor Logs**: Check server logs for suspicious login patterns or rate limit violations
 
 ### System Security
-- **File URL Protection**: File paths are encrypted using AES-256-GCM, making enumeration impossible
+- **File URL Protection**: File paths are encrypted using AES-256-GCM with session binding and TTL
+- **CSRF Attack Prevention**: File downloads protected against cross-site request forgery
+- **Cache Security**: Anti-caching headers prevent private files from being stored in shared proxies/CDNs
 - **Session Management**: Extended sessions are automatically secured with encrypted persistent cookies
-- **CSRF Protection**: All forms include anti-forgery tokens to prevent cross-site attacks
+- **Multi-Layer CSRF Protection**: Forms, file access, and headers all include anti-forgery protection
 - **IP Validation**: Optional session IP checking helps detect potential session hijacking
-- **Automatic Cleanup**: Expired sessions and tokens are automatically removed
+- **Automatic Cleanup**: Expired sessions, tokens, and file access credentials are automatically removed
 
 ### Infrastructure Security
 - **Regular Updates**: Keep PHP version current to get the latest security patches
@@ -364,13 +376,17 @@ Save and exit (press Esc, then type `:wq` and press Enter)
 - **Network Isolation**: Place HTTP server on separate VLAN for defense in depth
 - **HTTPS**: Use SSL/TLS encryption (via Cloudflare) for all traffic to protect credentials
 - **Log Monitoring**: Regular review of authentication logs helps identify security issues
+- **Enterprise Safe**: Works securely behind corporate proxies without cache leakage
+- **CDN Compatible**: Can be used with CDNs while maintaining file privacy
 
 ### Best Practices
 - **Use "Remember Me" only on personal devices** - avoid on public computers
 - **Regular password changes** if you suspect compromise
 - **Monitor failed login attempts** in server logs
 - **Clear browser data** when finished using shared computers
-- **Keep encryption key secure** - treat it like a master password 
+- **Keep encryption key secure** - treat it like a master password
+- **Shared networks safe**: Files won't be cached in corporate proxies or CDNs
+- **Private content stays private**: Anti-caching headers prevent unintended sharing 
 
 ## Troubleshooting
 
@@ -414,6 +430,18 @@ Save and exit (press Esc, then type `:wq` and press Enter)
 - Ensure the domain matches between login and access
 - Server logs will show if remember me tokens are being validated
 
+**File Download Issues:**
+- **"Cross-origin request blocked"**: File links have 24-hour expiration for security
+- **"Invalid file ID format"**: File access tokens may have expired, refresh the page
+- **Downloads fail from bookmarks**: Old bookmarked file links expire after 24 hours
+- **External links don't work**: File downloads are protected against cross-site access
+
+**Token Expiration Messages:**
+- File access tokens expire after 24 hours for security
+- Refresh the file listing page to generate new download links after expiration
+- 24-hour window accommodates large files and slow connections
+- Direct file URLs are session-bound and user-specific
+
 ### Log Analysis
 Check your web server error logs for detailed information:
 ```bash
@@ -427,6 +455,12 @@ tail -f /var/log/php_errors.log
 # "Successful login from IP: x.x.x.x (User type: primary)"
 # "Failed login attempt from IP: x.x.x.x (Attempt 3)"
 # "Blocked login attempt from IP: x.x.x.x"
+
+# Look for security events like:
+# "File access token expired (created: 2024-01-01 12:00:00)"
+# "Session ID mismatch in file access token"
+# "Potential CSRF attempt from IP: x.x.x.x, Origin: https://evil.com"
+# "Invalid input too long for field: password (length: 5000, max: 1000)"
 ```
 
 ## License

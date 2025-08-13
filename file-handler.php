@@ -38,6 +38,47 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
     exit;
 }
 
+// CSRF Protection: Validate Origin/Referer headers for file downloads
+function validateFileAccessHeaders() {
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $referer = $_SERVER['HTTP_REFERER'] ?? '';
+    
+    // Allow same-origin requests
+    if (!empty($origin)) {
+        $originHost = parse_url($origin, PHP_URL_HOST);
+        if ($originHost === $host) {
+            return true;
+        }
+    }
+    
+    // Allow requests from same host via referer
+    if (!empty($referer)) {
+        $refererHost = parse_url($referer, PHP_URL_HOST);
+        if ($refererHost === $host) {
+            return true;
+        }
+    }
+    
+    // Allow direct access (no referer/origin) for direct links and bookmarks
+    if (empty($origin) && empty($referer)) {
+        return true;
+    }
+    
+    // Log potential CSRF attempt
+    $clientIP = getClientIP();
+    error_log("Potential CSRF attempt from IP: {$clientIP}, Origin: {$origin}, Referer: {$referer}, Host: {$host}");
+    
+    return false;
+}
+
+// Perform CSRF header validation
+if (!validateFileAccessHeaders()) {
+    header('HTTP/1.1 403 Forbidden');
+    header('Content-Type: text/plain');
+    exit('Cross-origin request blocked for security');
+}
+
 // If we have a file ID, decode it
 if (isset($_GET['id']) && !empty($_GET['id'])) {
     // Validate encrypted ID format first
@@ -127,26 +168,48 @@ $start = 0;
 $end = $fileSize - 1;
 
 if (isset($_SERVER['HTTP_RANGE'])) {
-    $isPartial = true;
-    list($unit, $range) = explode('=', $_SERVER['HTTP_RANGE'], 2);
-    
-    if ($unit == 'bytes') {
-        // Multiple ranges could be specified at the same time
-        // We'll just handle the first range for now
-        list($range) = explode(',', $range, 2);
-        
-        // Range can be: bytes=0-100 or bytes=100- or bytes=-100
-        if (strpos($range, '-') !== false) {
-            list($start, $end) = explode('-', $range, 2);
+    // Parse Range header according to RFC 7233
+    if (preg_match('/bytes=\s*(\d*)-(\d*)/i', $_SERVER['HTTP_RANGE'], $m)) {
+        $rangeStart = $m[1] === '' ? null : (int)$m[1];
+        $rangeEnd = $m[2] === '' ? null : (int)$m[2];
+
+        if ($rangeStart === null && $rangeEnd !== null) {
+            // Suffix-byte-range-spec: bytes=-N (last N bytes)
+            $start = max(0, $fileSize - $rangeEnd);
+            $end = $fileSize - 1;
+        } elseif ($rangeStart !== null && $rangeEnd === null) {
+            // Byte-range-spec: bytes=N- (from byte N to end)
+            $start = $rangeStart;
+            $end = $fileSize - 1;
+        } elseif ($rangeStart !== null && $rangeEnd !== null) {
+            // Byte-range-spec: bytes=N-M (from byte N to byte M)
+            $start = $rangeStart;
+            $end = min($rangeEnd, $fileSize - 1);
+            
+            // Check for invalid range where start > end
+            if ($end < $start) {
+                header('HTTP/1.1 416 Range Not Satisfiable');
+                header('Content-Range: bytes */' . $fileSize);
+                exit('Range Not Satisfiable');
+            }
+        } else {
+            // Invalid range specification
+            header('HTTP/1.1 416 Range Not Satisfiable');
+            header('Content-Range: bytes */' . $fileSize);
+            exit('Invalid Range');
         }
         
-        // Handle cases where range is bytes=100- or bytes=-100
-        $start = ($start === '') ? 0 : intval($start);
-        $end = ($end === '') ? $fileSize - 1 : intval($end);
+        // Ensure start is within valid bounds
+        if ($start >= $fileSize) {
+            header('HTTP/1.1 416 Range Not Satisfiable');
+            header('Content-Range: bytes */' . $fileSize);
+            exit('Range Not Satisfiable');
+        }
         
-        // Clamp values
-        $start = max(0, min($start, $fileSize - 1));
-        $end = min($fileSize - 1, max($start, $end));
+        $isPartial = true;
+    } else {
+        // Malformed Range header - ignore and serve full content
+        $isPartial = false;
     }
 }
 
@@ -185,7 +248,11 @@ if ($forceDownload) {
 
 // Add additional headers for better transfer handling
 header('Accept-Ranges: bytes');
-header('Cache-Control: public, max-age=86400'); // Cache for 1 day
+
+// CRITICAL: Prevent caching of authenticated content in shared caches
+header('Cache-Control: private, max-age=0, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 // Add security headers
 header('X-Content-Type-Options: nosniff');
