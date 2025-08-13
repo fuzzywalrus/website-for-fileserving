@@ -1,8 +1,8 @@
-# A database-free (and JS-free) Web File Browser, turn any computer or NAS into a file server!
+# A database-free Web File Browser, turn any computer or NAS into a file server!
 
 Share files with your friends and family! This simple PHP application lets you create your own personal file-sharing website using your Synology NAS (or any web server with PHP support). Create a private file server that's easy to use and (fairly) secure. Run the HTTP server from a Raspberry Pi to metal gap your NAS. THis is a database free setup that uses a `.env` file for configuration which removes the headache of needing to set up a database and protecting it.
 
-This allows Synology-like File Station on any NAS, and allows for more customized experience and less exposed solution for Synology users. Host your HTTP server on a separate computer or virtual machine or however you like.
+This allows Synology-like File Station on any NAS, and allows for more customized experience and less exposed solution for Synology users. Host your HTTP server on a separate computer or virtual machine or however you like. 
 
 ![screenshot](https://i.imgur.com/SPCMAOc.png)
 
@@ -23,7 +23,7 @@ I wrote this so I could create a private web server to share files with a few fr
   - File URLs protected with AES-256-GCM encryption
   - Secure encrypted cookies for persistent authentication
   - Path traversal protection and input sanitization
-  - Comprehensive security logging and monitoring
+  - Security logging and monitoring
 - 🎬 Preview media files directly in browser
 - ⏱️ **Flexible Session Management**
   - 24-hour sessions for regular logins
@@ -32,6 +32,8 @@ I wrote this so I could create a private web server to share files with a few fr
 - 🔄 Easy to customize
 - 🔑 Instructions for CloudFlare Tunnel for reverse proxy protection
 - 💾 Apache and NGNIX agnostic, use your preferred hosting
+- ⚙️ Minimal configuration required via `.env` file
+- 🔗 Only Bootstrap JS used for client-side interactions (no frameworks)
 
 ## Installation
 
@@ -65,6 +67,8 @@ EXCLUDED_ITEMS=@eaDir,#recycle,.DS_Store,Desktop DB,Desktop DF
 # Environment (development/production)
 ENVIRONMENT=production
 ```
+
+For the AI assisted coders out there, AI agents shouldn't have much of a problem hacking in different accounts. I'd suggest asking the agent to reference this Readme.md for the `.env` file format, and then ask it to create account classes or tertiary accounts with different permissions.
 
 ### Secondary Access
 
