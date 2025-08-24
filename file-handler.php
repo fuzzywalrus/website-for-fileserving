@@ -38,6 +38,12 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
     exit;
 }
 
+// Honor secondary user scope (mirror auth.php logic)
+if (!empty($_SESSION['is_secondary_user']) && $_SESSION['is_secondary_user'] === true) {
+    // $secondaryBaseDir comes from config.php (already included)
+    $baseDir = $secondaryBaseDir;
+}
+
 // CSRF Protection: Validate Origin/Referer headers for file downloads
 function validateFileAccessHeaders() {
     $host = $_SERVER['HTTP_HOST'] ?? '';
@@ -261,6 +267,8 @@ header('Expires: 0');
 // Add security headers
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 
 // Flush headers
 flush();

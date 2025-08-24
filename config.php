@@ -8,9 +8,14 @@ if (basename($_SERVER['SCRIPT_FILENAME']) === basename(__FILE__)) {
 // Load environment variables from .env file
 require_once 'env.php';
 
-// Error reporting for debugging (remove in production)
-ini_set('display_errors', 1);
-error_reporting(E_ALL);
+// Error reporting (dev vs prod)
+if (($_ENV['ENVIRONMENT'] ?? '') === 'development') {
+    ini_set('display_errors', 1);
+    error_reporting(E_ALL);
+} else {
+    ini_set('display_errors', 0);
+    error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED & ~E_STRICT);
+}
 
 // Check and load critical configuration values
 $requiredEnvVars = ['BASE_DIR', 'PASSWORD', 'ENCRYPTION_KEY'];

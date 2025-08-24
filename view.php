@@ -1,3 +1,11 @@
+<?php
+// Add security headers
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+header('Content-Security-Policy: default-src \'self\' https://cdnjs.cloudflare.com; style-src \'self\' https://cdnjs.cloudflare.com \'unsafe-inline\'; script-src \'self\' https://cdnjs.cloudflare.com; font-src \'self\' https://cdnjs.cloudflare.com; img-src \'self\' data:');
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
