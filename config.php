@@ -37,7 +37,31 @@ if (!empty($missingVars)) {
 // Primary configuration settings
 $baseDir = $_ENV['BASE_DIR'];
 $password = $_ENV['PASSWORD'];
-$encryptionKey = $_ENV['ENCRYPTION_KEY'];
+
+// Validate and process encryption key
+$rawEncryptionKey = $_ENV['ENCRYPTION_KEY'];
+
+// Check if key is hex-encoded (64 hex chars = 32 bytes)
+if (strlen($rawEncryptionKey) === 64 && ctype_xdigit($rawEncryptionKey)) {
+    // Use hex-decoded key directly to preserve entropy
+    $encryptionKey = hex2bin($rawEncryptionKey);
+    if ($encryptionKey === false) {
+        die('Configuration error: Invalid hex encryption key format.');
+    }
+} else {
+    // For non-hex keys, enforce minimum length and derive via SHA-256
+    if (strlen($rawEncryptionKey) < 32) {
+        $errorMsg = 'ENCRYPTION_KEY must be at least 32 characters or 64 hex characters';
+        error_log($errorMsg);
+        if (isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] === 'development') {
+            die('Configuration Error: ' . $errorMsg);
+        } else {
+            die('Configuration error. Please contact the administrator.');
+        }
+    }
+    // Hash the key to get consistent 32-byte result
+    $encryptionKey = hash('sha256', $rawEncryptionKey, true);
+}
 
 // Secondary password settings (optional)
 $hasSecondaryPassword = isset($_ENV['SECONDARY_PASSWORD']) && !empty($_ENV['SECONDARY_PASSWORD']);

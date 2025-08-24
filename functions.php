@@ -241,8 +241,8 @@ function encryptPath($path, $ttlMinutes = 1440) { // 24 hours default
             'ip' => getClientIP()
         ]);
         
-        // Ensure we have a proper 32-byte key for AES-256
-        $key = hash('sha256', $encryptionKey, true);
+        // Use the pre-processed 32-byte key directly
+        $key = $encryptionKey;
         
         // Generate a random 12-byte nonce (96 bits - recommended for GCM)
         $nonce = random_bytes(12);
@@ -297,8 +297,8 @@ function decryptPath($encryptedData) {
         $tag = substr($combined, 12, 16);
         $encrypted = substr($combined, 28);
         
-        // Ensure we have the same 32-byte key
-        $key = hash('sha256', $encryptionKey, true);
+        // Use the same pre-processed 32-byte key
+        $key = $encryptionKey;
         
         // Use the same additional authenticated data (AAD)
         $aad = 'file_access_token';
@@ -378,7 +378,10 @@ function base64url_encode($data) {
  * @return string|false Decoded data or false on failure
  */
 function base64url_decode($data) {
-    return base64_decode(str_pad(strtr($data, '-_', '+/'), strlen($data) % 4, '=', STR_PAD_RIGHT));
+    $data = strtr($data, '-_', '+/');
+    $pad = strlen($data) % 4;
+    if ($pad) { $data .= str_repeat('=', 4 - $pad); }
+    return base64_decode($data);
 }
 
 /**
@@ -477,7 +480,7 @@ function recordFailedAttempt($ip) {
         }
     }
     
-    // Initialize or update the attempt counter
+    // Initialize or update the attempt counter with 30-second windowing
     if (!isset($rateLimits[$ip])) {
         $rateLimits[$ip] = [
             'attempts' => 1,
@@ -485,7 +488,19 @@ function recordFailedAttempt($ip) {
             'unblock_time' => 0
         ];
     } else {
-        $rateLimits[$ip]['attempts']++;
+        // Check if 30 seconds have passed since the first attempt in current window
+        $windowDuration = 30; // 30 seconds
+        if ($currentTime - $rateLimits[$ip]['first_attempt'] > $windowDuration) {
+            // Reset the window - start counting from this attempt
+            $rateLimits[$ip] = [
+                'attempts' => 1,
+                'first_attempt' => $currentTime,
+                'unblock_time' => 0
+            ];
+        } else {
+            // Still within the 30-second window
+            $rateLimits[$ip]['attempts']++;
+        }
     }
     
     $attempts = $rateLimits[$ip]['attempts'];
@@ -755,8 +770,8 @@ function encryptCookieData($data) {
             'purpose' => 'remember_cookie'
         ]);
         
-        // Ensure we have a proper 32-byte key for AES-256
-        $key = hash('sha256', $encryptionKey, true);
+        // Use the pre-processed 32-byte key directly
+        $key = $encryptionKey;
         
         // Generate a random 12-byte nonce (96 bits - recommended for GCM)
         $nonce = random_bytes(12);
@@ -811,8 +826,8 @@ function decryptCookieData($encryptedData) {
         $tag = substr($combined, 12, 16);
         $encrypted = substr($combined, 28);
         
-        // Ensure we have the same 32-byte key
-        $key = hash('sha256', $encryptionKey, true);
+        // Use the same pre-processed 32-byte key
+        $key = $encryptionKey;
         
         // Use the same AAD as encryption
         $aad = 'remember_me_cookie';
