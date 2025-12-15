@@ -615,6 +615,89 @@ function setSecureSessionParams($extended = false) {
 }
 
 /**
+ * Get the path to the persistent token storage file
+ * 
+ * @return string Path to token storage file
+ */
+function getTokenStorageFile() {
+    return sys_get_temp_dir() . '/remember_tokens.json';
+}
+
+/**
+ * Load remember tokens from persistent storage
+ * 
+ * @return array Array of tokens indexed by token string
+ */
+function loadRememberTokens() {
+    $tokenFile = getTokenStorageFile();
+    $tokens = [];
+    
+    if (file_exists($tokenFile)) {
+        $data = @file_get_contents($tokenFile);
+        if ($data !== false) {
+            $tokens = json_decode($data, true) ?: [];
+        }
+    }
+    
+    return $tokens;
+}
+
+/**
+ * Save remember tokens to persistent storage
+ * 
+ * @param array $tokens Array of tokens to save
+ * @return bool True on success, false on failure
+ */
+function saveRememberTokens($tokens) {
+    $tokenFile = getTokenStorageFile();
+    
+    // Ensure directory exists and is writable
+    $dir = dirname($tokenFile);
+    if (!is_dir($dir) || !is_writable($dir)) {
+        error_log("Token storage directory not writable: {$dir}");
+        return false;
+    }
+    
+    // Write with file locking
+    $result = @file_put_contents($tokenFile, json_encode($tokens), LOCK_EX);
+    
+    if ($result === false) {
+        error_log("Failed to save remember tokens to: {$tokenFile}");
+        return false;
+    }
+    
+    // Set restrictive permissions (owner read/write only)
+    @chmod($tokenFile, 0600);
+    
+    return true;
+}
+
+/**
+ * Clean up expired tokens from storage
+ * 
+ * @return int Number of tokens removed
+ */
+function cleanupExpiredTokens() {
+    $tokens = loadRememberTokens();
+    $currentTime = time();
+    $maxAge = 30 * 24 * 60 * 60; // 30 days
+    $removed = 0;
+    
+    foreach ($tokens as $token => $data) {
+        if (!isset($data['created']) || ($currentTime - $data['created']) > $maxAge) {
+            unset($tokens[$token]);
+            $removed++;
+        }
+    }
+    
+    if ($removed > 0) {
+        saveRememberTokens($tokens);
+    }
+    
+    return $removed;
+}
+
+/**
  * Generate a secure remember me token
  * 
  * @return string A cryptographically secure token
@@ -656,14 +739,14 @@ function setRememberCookie($token, $isSecondaryUser = false, $expiry = null) {
         'samesite' => 'Strict',
     ]);
     
-    // LIMITATION: Store token in session for validation
-    // NOTE: This is still fragile - tokens will be lost when session expires
-    // TODO: Implement proper persistent token store (database/file) for production use
-    $_SESSION['remember_tokens'][$token] = [
+    // Store token in persistent file storage (survives session expiration)
+    $tokens = loadRememberTokens();
+    $tokens[$token] = [
         'created' => time(),
         'is_secondary' => $isSecondaryUser,
         'ip' => getClientIP()
     ];
+    saveRememberTokens($tokens);
 }
 
 /**
@@ -680,31 +763,41 @@ function checkRememberCookie() {
         // Decrypt and parse cookie data
         $decryptedData = decryptCookieData($_COOKIE['remember_auth']);
         if ($decryptedData === false) {
-            clearRememberCookie();
+            clearRememberCookie(true);
             return false;
         }
         
         $cookieData = json_decode($decryptedData, true);
         if (!$cookieData || !isset($cookieData['token'])) {
-            clearRememberCookie();
+            clearRememberCookie(true);
             return false;
         }
         
         $token = $cookieData['token'];
         
-        // Check if token exists in session storage
-        if (!isset($_SESSION['remember_tokens'][$token])) {
-            clearRememberCookie();
+        // Clean up expired tokens periodically (every 10th request on average)
+        if (rand(1, 10) === 1) {
+            cleanupExpiredTokens();
+        }
+        
+        // Load tokens from persistent storage
+        $tokens = loadRememberTokens();
+        
+        // Check if token exists in persistent storage
+        if (!isset($tokens[$token])) {
+            clearRememberCookie(true);
             return false;
         }
         
-        $storedData = $_SESSION['remember_tokens'][$token];
+        $storedData = $tokens[$token];
         
         // Validate token age (30 days max)
         $maxAge = 30 * 24 * 60 * 60; // 30 days
         if ((time() - $storedData['created']) > $maxAge) {
-            unset($_SESSION['remember_tokens'][$token]);
-            clearRememberCookie();
+            // Remove expired token
+            unset($tokens[$token]);
+            saveRememberTokens($tokens);
+            clearRememberCookie(true);
             return false;
         }
         
@@ -712,8 +805,9 @@ function checkRememberCookie() {
         if ($storedData['ip'] !== getClientIP()) {
             error_log("Remember me token IP mismatch. Original: {$storedData['ip']}, Current: " . getClientIP());
             // Uncomment the next lines if you want strict IP checking
-            // unset($_SESSION['remember_tokens'][$token]);
-            // clearRememberCookie();
+            // unset($tokens[$token]);
+            // saveRememberTokens($tokens);
+            // clearRememberCookie(true);
             // return false;
         }
         
@@ -725,31 +819,54 @@ function checkRememberCookie() {
         
     } catch (Exception $e) {
         error_log("Remember cookie validation error: " . $e->getMessage());
-        clearRememberCookie();
+        clearRememberCookie(true);
         return false;
     }
 }
 
 /**
- * Clear the remember me cookie
+ * Clear the remember me cookie and optionally remove token from storage
  */
-function clearRememberCookie() {
+function clearRememberCookie($removeToken = false) {
     if (isset($_COOKIE['remember_auth'])) {
+        // Try to extract token before clearing cookie
+        $token = null;
+        if ($removeToken) {
+            try {
+                $decryptedData = decryptCookieData($_COOKIE['remember_auth']);
+                if ($decryptedData !== false) {
+                    $cookieData = json_decode($decryptedData, true);
+                    if ($cookieData && isset($cookieData['token'])) {
+                        $token = $cookieData['token'];
+                    }
+                }
+            } catch (Exception $e) {
+                // Ignore errors when extracting token
+            }
+        }
+        
         $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
                 || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
         setcookie('remember_auth', '', time() - 3600, '/', '', $isHttps, true);
         unset($_COOKIE['remember_auth']);
+        
+        // Remove token from storage if requested
+        if ($token !== null) {
+            removeRememberToken($token);
+        }
     }
 }
 
 /**
- * Remove a specific remember token
+ * Remove a specific remember token from persistent storage
  * 
  * @param string $token The token to remove
  */
 function removeRememberToken($token) {
-    if (isset($_SESSION['remember_tokens'][$token])) {
-        unset($_SESSION['remember_tokens'][$token]);
+    $tokens = loadRememberTokens();
+    if (isset($tokens[$token])) {
+        unset($tokens[$token]);
+        saveRememberTokens($tokens);
     }
 }
 

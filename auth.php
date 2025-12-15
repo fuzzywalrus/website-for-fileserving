@@ -14,8 +14,8 @@ session_start();
 
 // Handle logout
 if (isset($_GET['logout'])) {
-    // Clear remember me cookie if it exists
-    clearRememberCookie();
+    // Clear remember me cookie if it exists and remove token from storage
+    clearRememberCookie(true);
     session_destroy();
     header('Location: index.php');
     exit;
@@ -31,7 +31,7 @@ if (isset($_SESSION['authenticated']) && $_SESSION['authenticated'] === true) {
     $sessionTimeout = isset($_SESSION['extended_session']) && $_SESSION['extended_session'] ? 2592000 : 86400; // 30 days vs 24 hours
     if (isset($_SESSION['login_time']) && (time() - $_SESSION['login_time']) > $sessionTimeout) {
         // Session expired
-        clearRememberCookie();
+        clearRememberCookie(true);
         session_destroy();
         $loginError = "Your session has expired. Please log in again.";
     } else {
@@ -40,7 +40,7 @@ if (isset($_SESSION['authenticated']) && $_SESSION['authenticated'] === true) {
         if (isset($_SESSION['login_ip']) && $_SESSION['login_ip'] !== $currentIP) {
             // IP changed - could be session hijacking
             error_log("Session IP mismatch for user. Original: {$_SESSION['login_ip']}, Current: {$currentIP}");
-            clearRememberCookie();
+            clearRememberCookie(true);
             session_destroy();
             $loginError = "Security error: Your session has been terminated. Please log in again.";
         } else {
