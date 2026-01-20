@@ -86,3 +86,91 @@ $excludedItems = isset($_ENV['EXCLUDED_ITEMS']) ?
 // Site customization settings
 $siteTitle = $_ENV['SITE_TITLE'] ?? 'Directory Browser';
 $siteStats = $_ENV['SITE_STATS'] ?? '';
+
+// ======================
+// HLS Streaming Configuration
+// ======================
+
+// Enable/disable video streaming
+$streamingEnabled = isset($_ENV['ENABLE_STREAMING']) && 
+    (strtolower($_ENV['ENABLE_STREAMING']) === 'true' || $_ENV['ENABLE_STREAMING'] === '1');
+
+// Video quality setting (480p, 720p, or 1080p)
+$streamingQuality = $_ENV['STREAMING_QUALITY'] ?? '720p';
+
+// Validate quality setting
+$validQualities = ['480p', '720p', '1080p'];
+if (!in_array($streamingQuality, $validQualities)) {
+    error_log("Invalid STREAMING_QUALITY: {$streamingQuality}. Defaulting to 720p");
+    $streamingQuality = '720p';
+}
+
+// Cache directory for HLS segments
+$streamingCacheDir = $_ENV['STREAMING_CACHE_DIR'] ?? './cache/hls';
+
+// Create cache directory if streaming is enabled
+if ($streamingEnabled) {
+    // Convert relative path to absolute if needed
+    if (!preg_match('/^[\/~]/', $streamingCacheDir)) {
+        $streamingCacheDir = dirname(__FILE__) . '/' . $streamingCacheDir;
+    }
+    
+    // Create directory with proper permissions if it doesn't exist
+    if (!is_dir($streamingCacheDir)) {
+        if (!@mkdir($streamingCacheDir, 0755, true)) {
+            error_log("Failed to create streaming cache directory: {$streamingCacheDir}");
+            if (isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] === 'development') {
+                die('Configuration Error: Failed to create streaming cache directory. Check permissions.');
+            }
+        }
+    }
+    
+    // Verify directory is writable
+    if (!is_writable($streamingCacheDir)) {
+        error_log("Streaming cache directory is not writable: {$streamingCacheDir}");
+        if (isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] === 'development') {
+            die('Configuration Error: Streaming cache directory is not writable. Check permissions.');
+        }
+    }
+}
+
+// Cache TTL in seconds (default 24 hours)
+$streamingCacheTTL = isset($_ENV['STREAMING_CACHE_TTL']) ? 
+    (int)$_ENV['STREAMING_CACHE_TTL'] : 86400;
+
+// Hardware acceleration setting
+$hwAccel = $_ENV['HW_ACCEL'] ?? 'auto';
+$hwAccelOverride = $_ENV['HW_ACCEL_OVERRIDE'] ?? '';
+
+// Use override if set, otherwise use auto-detected value
+if (!empty($hwAccelOverride)) {
+    $hwAccel = $hwAccelOverride;
+}
+
+// Validate hardware acceleration setting
+$validHwAccel = ['auto', 'intel', 'nvidia', 'amd', 'none'];
+if (!in_array($hwAccel, $validHwAccel)) {
+    error_log("Invalid HW_ACCEL: {$hwAccel}. Defaulting to auto");
+    $hwAccel = 'auto';
+}
+
+// FFmpeg paths
+$ffmpegPath = $_ENV['FFMPEG_PATH'] ?? '/usr/bin/ffmpeg';
+$ffprobePath = $_ENV['FFPROBE_PATH'] ?? '/usr/bin/ffprobe';
+
+// Verify FFmpeg is available if streaming is enabled
+if ($streamingEnabled) {
+    if (!file_exists($ffmpegPath) || !is_executable($ffmpegPath)) {
+        error_log("FFmpeg not found or not executable at: {$ffmpegPath}");
+        if (isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] === 'development') {
+            die('Configuration Error: FFmpeg not found. Please install FFmpeg or set correct FFMPEG_PATH in .env');
+        }
+    }
+    
+    if (!file_exists($ffprobePath) || !is_executable($ffprobePath)) {
+        error_log("FFprobe not found or not executable at: {$ffprobePath}");
+        if (isset($_ENV['ENVIRONMENT']) && $_ENV['ENVIRONMENT'] === 'development') {
+            die('Configuration Error: FFprobe not found. Please install FFmpeg or set correct FFPROBE_PATH in .env');
+        }
+    }
+}

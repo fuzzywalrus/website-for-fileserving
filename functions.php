@@ -206,14 +206,33 @@ function getFileIcon($file) {
 
 // Function to check if file is playable/viewable
 function isPlayable($file) {
+    global $streamingEnabled;
+    
     $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-    $playable = [
-        'mp4', 'webm', 'ogg', 'mp3', 'wav', 
-        'jpg', 'jpeg', 'png', 'gif', 'pdf',
-        'html', 'htm', 'txt'  // Added HTML and TXT files
+    
+    // Non-video playable files (always allowed)
+    $nonVideoPlayable = [
+        'mp3', 'wav', 'ogg',  // Audio
+        'jpg', 'jpeg', 'png', 'gif',  // Images
+        'pdf', 'html', 'htm', 'txt'  // Documents
     ];
     
-    return in_array($extension, $playable);
+    // Video formats (only playable if streaming is enabled)
+    $videoFormats = [
+        'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'm4v', 'webm'
+    ];
+    
+    // Non-video files are always playable
+    if (in_array($extension, $nonVideoPlayable)) {
+        return true;
+    }
+    
+    // Video files are only playable if streaming is enabled
+    if (in_array($extension, $videoFormats)) {
+        return $streamingEnabled;
+    }
+    
+    return false;
 }
 
 /**
@@ -615,6 +634,89 @@ function setSecureSessionParams($extended = false) {
 }
 
 /**
+ * Get the path to the persistent token storage file
+ * 
+ * @return string Path to token storage file
+ */
+function getTokenStorageFile() {
+    return sys_get_temp_dir() . '/remember_tokens.json';
+}
+
+/**
+ * Load remember tokens from persistent storage
+ * 
+ * @return array Array of tokens indexed by token string
+ */
+function loadRememberTokens() {
+    $tokenFile = getTokenStorageFile();
+    $tokens = [];
+    
+    if (file_exists($tokenFile)) {
+        $data = @file_get_contents($tokenFile);
+        if ($data !== false) {
+            $tokens = json_decode($data, true) ?: [];
+        }
+    }
+    
+    return $tokens;
+}
+
+/**
+ * Save remember tokens to persistent storage
+ * 
+ * @param array $tokens Array of tokens to save
+ * @return bool True on success, false on failure
+ */
+function saveRememberTokens($tokens) {
+    $tokenFile = getTokenStorageFile();
+    
+    // Ensure directory exists and is writable
+    $dir = dirname($tokenFile);
+    if (!is_dir($dir) || !is_writable($dir)) {
+        error_log("Token storage directory not writable: {$dir}");
+        return false;
+    }
+    
+    // Write with file locking
+    $result = @file_put_contents($tokenFile, json_encode($tokens), LOCK_EX);
+    
+    if ($result === false) {
+        error_log("Failed to save remember tokens to: {$tokenFile}");
+        return false;
+    }
+    
+    // Set restrictive permissions (owner read/write only)
+    @chmod($tokenFile, 0600);
+    
+    return true;
+}
+
+/**
+ * Clean up expired tokens from storage
+ * 
+ * @return int Number of tokens removed
+ */
+function cleanupExpiredTokens() {
+    $tokens = loadRememberTokens();
+    $currentTime = time();
+    $maxAge = 30 * 24 * 60 * 60; // 30 days
+    $removed = 0;
+    
+    foreach ($tokens as $token => $data) {
+        if (!isset($data['created']) || ($currentTime - $data['created']) > $maxAge) {
+            unset($tokens[$token]);
+            $removed++;
+        }
+    }
+    
+    if ($removed > 0) {
+        saveRememberTokens($tokens);
+    }
+    
+    return $removed;
+}
+
+/**
  * Generate a secure remember me token
  * 
  * @return string A cryptographically secure token
@@ -656,14 +758,14 @@ function setRememberCookie($token, $isSecondaryUser = false, $expiry = null) {
         'samesite' => 'Strict',
     ]);
     
-    // LIMITATION: Store token in session for validation
-    // NOTE: This is still fragile - tokens will be lost when session expires
-    // TODO: Implement proper persistent token store (database/file) for production use
-    $_SESSION['remember_tokens'][$token] = [
+    // Store token in persistent file storage (survives session expiration)
+    $tokens = loadRememberTokens();
+    $tokens[$token] = [
         'created' => time(),
         'is_secondary' => $isSecondaryUser,
         'ip' => getClientIP()
     ];
+    saveRememberTokens($tokens);
 }
 
 /**
@@ -680,31 +782,41 @@ function checkRememberCookie() {
         // Decrypt and parse cookie data
         $decryptedData = decryptCookieData($_COOKIE['remember_auth']);
         if ($decryptedData === false) {
-            clearRememberCookie();
+            clearRememberCookie(true);
             return false;
         }
         
         $cookieData = json_decode($decryptedData, true);
         if (!$cookieData || !isset($cookieData['token'])) {
-            clearRememberCookie();
+            clearRememberCookie(true);
             return false;
         }
         
         $token = $cookieData['token'];
         
-        // Check if token exists in session storage
-        if (!isset($_SESSION['remember_tokens'][$token])) {
-            clearRememberCookie();
+        // Clean up expired tokens periodically (every 10th request on average)
+        if (rand(1, 10) === 1) {
+            cleanupExpiredTokens();
+        }
+        
+        // Load tokens from persistent storage
+        $tokens = loadRememberTokens();
+        
+        // Check if token exists in persistent storage
+        if (!isset($tokens[$token])) {
+            clearRememberCookie(true);
             return false;
         }
         
-        $storedData = $_SESSION['remember_tokens'][$token];
+        $storedData = $tokens[$token];
         
         // Validate token age (30 days max)
         $maxAge = 30 * 24 * 60 * 60; // 30 days
         if ((time() - $storedData['created']) > $maxAge) {
-            unset($_SESSION['remember_tokens'][$token]);
-            clearRememberCookie();
+            // Remove expired token
+            unset($tokens[$token]);
+            saveRememberTokens($tokens);
+            clearRememberCookie(true);
             return false;
         }
         
@@ -712,8 +824,9 @@ function checkRememberCookie() {
         if ($storedData['ip'] !== getClientIP()) {
             error_log("Remember me token IP mismatch. Original: {$storedData['ip']}, Current: " . getClientIP());
             // Uncomment the next lines if you want strict IP checking
-            // unset($_SESSION['remember_tokens'][$token]);
-            // clearRememberCookie();
+            // unset($tokens[$token]);
+            // saveRememberTokens($tokens);
+            // clearRememberCookie(true);
             // return false;
         }
         
@@ -725,31 +838,54 @@ function checkRememberCookie() {
         
     } catch (Exception $e) {
         error_log("Remember cookie validation error: " . $e->getMessage());
-        clearRememberCookie();
+        clearRememberCookie(true);
         return false;
     }
 }
 
 /**
- * Clear the remember me cookie
+ * Clear the remember me cookie and optionally remove token from storage
  */
-function clearRememberCookie() {
+function clearRememberCookie($removeToken = false) {
     if (isset($_COOKIE['remember_auth'])) {
+        // Try to extract token before clearing cookie
+        $token = null;
+        if ($removeToken) {
+            try {
+                $decryptedData = decryptCookieData($_COOKIE['remember_auth']);
+                if ($decryptedData !== false) {
+                    $cookieData = json_decode($decryptedData, true);
+                    if ($cookieData && isset($cookieData['token'])) {
+                        $token = $cookieData['token'];
+                    }
+                }
+            } catch (Exception $e) {
+                // Ignore errors when extracting token
+            }
+        }
+        
         $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
                 || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
         setcookie('remember_auth', '', time() - 3600, '/', '', $isHttps, true);
         unset($_COOKIE['remember_auth']);
+        
+        // Remove token from storage if requested
+        if ($token !== null) {
+            removeRememberToken($token);
+        }
     }
 }
 
 /**
- * Remove a specific remember token
+ * Remove a specific remember token from persistent storage
  * 
  * @param string $token The token to remove
  */
 function removeRememberToken($token) {
-    if (isset($_SESSION['remember_tokens'][$token])) {
-        unset($_SESSION['remember_tokens'][$token]);
+    $tokens = loadRememberTokens();
+    if (isset($tokens[$token])) {
+        unset($tokens[$token]);
+        saveRememberTokens($tokens);
     }
 }
 
@@ -983,4 +1119,419 @@ function validateEncryptedId($encryptedId) {
     }
     
     return $validated;
+}
+
+/**
+ * ==============================================
+ * HLS Video Streaming Helper Functions
+ * ==============================================
+ */
+
+/**
+ * Check if file is a video file
+ * 
+ * @param string $filename The filename to check
+ * @return bool True if file is a video
+ */
+function isVideoFile($filename) {
+    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    $videoFormats = [
+        'mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'm4v', 'webm', 
+        'mpg', 'mpeg', 'm2v', 'ogv', '3gp', 'f4v'
+    ];
+    
+    return in_array($extension, $videoFormats);
+}
+
+/**
+ * Check if video format needs HLS streaming (not browser-native)
+ * 
+ * @param string $filename The filename to check
+ * @return bool True if video needs transcoding
+ */
+function isStreamableVideo($filename) {
+    $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    
+    // Browser-native formats (can play directly without transcoding)
+    $nativeFormats = ['mp4', 'webm', 'ogg'];
+    
+    // If it's a video but NOT a native format, it needs streaming
+    return isVideoFile($filename) && !in_array($extension, $nativeFormats);
+}
+
+/**
+ * Check if video format is browser-native (MP4/WebM)
+ * 
+ * @param string $extension The file extension
+ * @return bool True if browser can play natively
+ */
+function isBrowserNativeFormat($extension) {
+    $extension = strtolower($extension);
+    $nativeFormats = ['mp4', 'webm', 'ogg'];
+    
+    return in_array($extension, $nativeFormats);
+}
+
+/**
+ * Get video information using ffprobe
+ * 
+ * @param string $filepath Path to video file
+ * @return array|false Video info array or false on failure
+ */
+function getVideoInfo($filepath) {
+    global $ffprobePath;
+    
+    if (!file_exists($filepath)) {
+        return false;
+    }
+    
+    // Build ffprobe command to get JSON output
+    $cmd = escapeshellarg($ffprobePath) . ' -v quiet -print_format json -show_format -show_streams ' . escapeshellarg($filepath);
+    
+    $output = shell_exec($cmd);
+    if ($output === null) {
+        error_log("Failed to execute ffprobe for: {$filepath}");
+        return false;
+    }
+    
+    $info = json_decode($output, true);
+    if ($info === null) {
+        error_log("Failed to parse ffprobe output for: {$filepath}");
+        return false;
+    }
+    
+    // Extract useful information
+    $videoInfo = [
+        'duration' => $info['format']['duration'] ?? 0,
+        'size' => $info['format']['size'] ?? 0,
+        'bitrate' => $info['format']['bit_rate'] ?? 0,
+        'format' => $info['format']['format_name'] ?? 'unknown',
+    ];
+    
+    // Find video stream
+    foreach ($info['streams'] ?? [] as $stream) {
+        if ($stream['codec_type'] === 'video') {
+            $videoInfo['width'] = $stream['width'] ?? 0;
+            $videoInfo['height'] = $stream['height'] ?? 0;
+            $videoInfo['codec'] = $stream['codec_name'] ?? 'unknown';
+            $videoInfo['fps'] = 0;
+            
+            // Calculate FPS
+            if (isset($stream['r_frame_rate'])) {
+                $parts = explode('/', $stream['r_frame_rate']);
+                if (count($parts) === 2 && $parts[1] > 0) {
+                    $videoInfo['fps'] = round($parts[0] / $parts[1], 2);
+                }
+            }
+            break;
+        }
+    }
+    
+    return $videoInfo;
+}
+
+/**
+ * Get HLS cache directory path for a file
+ * 
+ * @param string $filePath The actual file path (not encrypted ID)
+ * @return string Path to cache directory
+ */
+function getHLSCachePath($filePath) {
+    global $streamingCacheDir;
+    
+    // Use hash of the actual file path for consistent cache keys
+    $pathHash = hash('sha256', $filePath);
+    
+    // Use first 2 chars of hash for subdirectory (better file system performance)
+    $subdir = substr($pathHash, 0, 2);
+    $cacheDir = $streamingCacheDir . '/' . $subdir . '/' . $pathHash;
+    
+    return $cacheDir;
+}
+
+/**
+ * Get HLS cache metadata
+ * 
+ * @param string $cachePath Path to cache directory
+ * @return array|false Metadata array or false if not found
+ */
+function getHLSCacheMetadata($cachePath) {
+    $metadataFile = $cachePath . '/metadata.json';
+    
+    if (!file_exists($metadataFile)) {
+        return false;
+    }
+    
+    $metadata = json_decode(file_get_contents($metadataFile), true);
+    if ($metadata === null) {
+        error_log("Failed to parse cache metadata: {$metadataFile}");
+        return false;
+    }
+    
+    return $metadata;
+}
+
+/**
+ * Update last access time for HLS cache
+ * 
+ * @param string $cachePath Path to cache directory
+ * @return bool True on success, false on failure
+ */
+function updateHLSCacheAccess($cachePath) {
+    $metadataFile = $cachePath . '/metadata.json';
+    
+    if (!file_exists($metadataFile)) {
+        return false;
+    }
+    
+    $metadata = json_decode(file_get_contents($metadataFile), true);
+    if ($metadata === null) {
+        return false;
+    }
+    
+    // Update last access time
+    $metadata['last_access'] = time();
+    
+    // Write back to file
+    $result = file_put_contents($metadataFile, json_encode($metadata, JSON_PRETTY_PRINT));
+    
+    return $result !== false;
+}
+
+/**
+ * Clean up expired HLS cache entries
+ * 
+ * @return array Statistics about cleanup (files_removed, space_freed, directories_cleaned)
+ */
+function cleanupExpiredHLSCache() {
+    global $streamingCacheDir, $streamingCacheTTL;
+    
+    $stats = [
+        'files_removed' => 0,
+        'space_freed' => 0,
+        'directories_cleaned' => 0
+    ];
+    
+    if (!is_dir($streamingCacheDir)) {
+        return $stats;
+    }
+    
+    $currentTime = time();
+    
+    // Iterate through subdirectories
+    $subdirs = glob($streamingCacheDir . '/*', GLOB_ONLYDIR);
+    foreach ($subdirs as $subdir) {
+        $cacheDirs = glob($subdir . '/*', GLOB_ONLYDIR);
+        
+        foreach ($cacheDirs as $cacheDir) {
+            $metadataFile = $cacheDir . '/metadata.json';
+            
+            if (!file_exists($metadataFile)) {
+                // No metadata, remove the directory
+                $stats['space_freed'] += getDirSize($cacheDir);
+                removeDirectory($cacheDir);
+                $stats['directories_cleaned']++;
+                continue;
+            }
+            
+            $metadata = json_decode(file_get_contents($metadataFile), true);
+            if ($metadata === null) {
+                // Invalid metadata, remove the directory
+                $stats['space_freed'] += getDirSize($cacheDir);
+                removeDirectory($cacheDir);
+                $stats['directories_cleaned']++;
+                continue;
+            }
+            
+            $lastAccess = $metadata['last_access'] ?? $metadata['created'] ?? 0;
+            $age = $currentTime - $lastAccess;
+            
+            // Remove if not accessed within TTL
+            if ($age > $streamingCacheTTL) {
+                $stats['space_freed'] += getDirSize($cacheDir);
+                removeDirectory($cacheDir);
+                $stats['directories_cleaned']++;
+            }
+        }
+        
+        // Remove empty subdirectories
+        if (count(scandir($subdir)) === 2) { // Only . and ..
+            @rmdir($subdir);
+        }
+    }
+    
+    return $stats;
+}
+
+/**
+ * Get directory size recursively
+ * 
+ * @param string $dir Directory path
+ * @return int Size in bytes
+ */
+function getDirSize($dir) {
+    $size = 0;
+    
+    if (!is_dir($dir)) {
+        return 0;
+    }
+    
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
+    );
+    
+    foreach ($files as $file) {
+        $size += $file->getSize();
+    }
+    
+    return $size;
+}
+
+/**
+ * Remove directory recursively
+ * 
+ * @param string $dir Directory path
+ * @return bool True on success
+ */
+function removeDirectory($dir) {
+    if (!is_dir($dir)) {
+        return false;
+    }
+    
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::CHILD_FIRST
+    );
+    
+    foreach ($files as $file) {
+        if ($file->isDir()) {
+            @rmdir($file->getRealPath());
+        } else {
+            @unlink($file->getRealPath());
+        }
+    }
+    
+    return @rmdir($dir);
+}
+
+/**
+ * Auto-detect available hardware acceleration
+ * 
+ * @return string Detected hardware acceleration type (intel, nvidia, amd, or none)
+ */
+function detectHardwareAccel() {
+    global $ffmpegPath;
+    
+    // Check for Intel QuickSync (VA-API)
+    if (file_exists('/dev/dri/renderD128')) {
+        // Test if VA-API encoding works
+        $testCmd = escapeshellarg($ffmpegPath) . ' -hide_banner -loglevel error -f lavfi -i testsrc=duration=1:size=320x240:rate=1 -c:v h264_vaapi -vaapi_device /dev/dri/renderD128 -vf "format=nv12,hwupload" -f null - 2>&1';
+        $output = shell_exec($testCmd);
+        
+        if (empty($output) || strpos($output, 'error') === false) {
+            // Check if it's Intel or AMD
+            $vainfo = shell_exec('vainfo 2>&1');
+            if (stripos($vainfo, 'intel') !== false) {
+                return 'intel';
+            } elseif (stripos($vainfo, 'amd') !== false || stripos($vainfo, 'radeon') !== false) {
+                return 'amd';
+            }
+            return 'intel'; // Default to intel if VA-API works
+        }
+    }
+    
+    // Check for NVIDIA NVENC
+    if (shell_exec('which nvidia-smi 2>/dev/null')) {
+        // Test if NVENC encoding works
+        $testCmd = escapeshellarg($ffmpegPath) . ' -hide_banner -loglevel error -f lavfi -i testsrc=duration=1:size=320x240:rate=1 -c:v h264_nvenc -f null - 2>&1';
+        $output = shell_exec($testCmd);
+        
+        if (empty($output) || strpos($output, 'error') === false) {
+            return 'nvidia';
+        }
+    }
+    
+    // No hardware acceleration available
+    return 'none';
+}
+
+/**
+ * Build FFmpeg command for HLS transcoding
+ * 
+ * @param string $input Input file path
+ * @param string $output Output directory path (must be absolute)
+ * @param string $hwaccel Hardware acceleration type
+ * @param string $quality Quality setting (480p, 720p, 1080p)
+ * @return string FFmpeg command
+ */
+function buildFFmpegCommand($input, $output, $hwaccel, $quality) {
+    global $ffmpegPath;
+    
+    $height = getQualityHeight($quality);
+    
+    // Ensure output paths are absolute
+    $output = realpath($output) ?: $output;
+    $playlistFile = $output . '/playlist.m3u8';
+    $segmentFile = $output . '/segment_%03d.ts';
+    
+    // Base command with increased analyzeduration for complex files
+    $cmd = escapeshellarg($ffmpegPath) . ' -hide_banner -loglevel warning -analyzeduration 100M -probesize 100M';
+    
+    // Hardware acceleration options
+    switch ($hwaccel) {
+        case 'intel':
+        case 'amd':
+            // VA-API acceleration - use software decode + hardware encode for better compatibility
+            $cmd .= ' -i ' . escapeshellarg($input);
+            $cmd .= ' -vf "format=nv12,hwupload,scale_vaapi=w=-2:h=' . $height . '"';
+            $cmd .= ' -vaapi_device /dev/dri/renderD128';
+            $cmd .= ' -c:v h264_vaapi -profile:v main -level 3.1 -b:v 2M -maxrate 2.5M -bufsize 5M';
+            break;
+            
+        case 'nvidia':
+            // NVIDIA NVENC acceleration
+            $cmd .= ' -hwaccel cuda -hwaccel_output_format cuda';
+            $cmd .= ' -i ' . escapeshellarg($input);
+            $cmd .= ' -vf "scale_cuda=-2:' . $height . '"';
+            $cmd .= ' -c:v h264_nvenc -profile:v main -level 3.1 -preset fast -b:v 2M -maxrate 2.5M -bufsize 5M';
+            break;
+            
+        case 'none':
+        default:
+            // Software encoding (most compatible)
+            $cmd .= ' -i ' . escapeshellarg($input);
+            $cmd .= ' -vf "scale=-2:' . $height . '"';
+            $cmd .= ' -c:v libx264 -pix_fmt yuv420p -profile:v main -level 3.1 -preset veryfast -b:v 2M -maxrate 2.5M -bufsize 5M -crf 23';
+            break;
+    }
+    
+    // Audio settings - map only first audio track to avoid issues
+    $cmd .= ' -map 0:v:0 -map 0:a:0?';
+    $cmd .= ' -c:a aac -b:a 128k -ac 2';
+    
+    // HLS settings
+    $cmd .= ' -f hls';
+    $cmd .= ' -hls_time 6'; // 6-second segments
+    $cmd .= ' -hls_list_size 0'; // Keep all segments in playlist
+    $cmd .= ' -hls_flags delete_segments+append_list';
+    $cmd .= ' -hls_segment_filename ' . escapeshellarg($segmentFile);
+    $cmd .= ' ' . escapeshellarg($playlistFile);
+    
+    return $cmd;
+}
+
+/**
+ * Convert quality string to pixel height
+ * 
+ * @param string $quality Quality setting (480p, 720p, 1080p)
+ * @return int Pixel height
+ */
+function getQualityHeight($quality) {
+    $heights = [
+        '480p' => 480,
+        '720p' => 720,
+        '1080p' => 1080
+    ];
+    
+    return $heights[$quality] ?? 720;
 }

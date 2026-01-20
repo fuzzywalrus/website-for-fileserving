@@ -10,39 +10,47 @@ I wrote this so I could create a private web server to share files with a few fr
 
 ## Features
 
-- ✨ Clean, responsive Bootstrap UI
-- 🔍 Built-in file name search
-- 📄 HTML document preview
-- 🔒 **Enhanced Authentication System**
+- Clean, responsive Bootstrap UI
+- Built-in file name search
+- HTML document preview
+- **HLS Video Streaming** (NEW!)
+  - FFmpeg-powered video transcoding to 720p/1080p/480p
+  - Hardware acceleration (Intel QuickSync, NVIDIA NVENC, AMD VCE)
+  - Smart playback detection (direct for MP4/WebM, HLS for MKV/AVI)
+  - Intelligent caching with 24-hour resume window
+  - Video.js player with hls.js fallback for all browsers
+  - Completely optional (can be disabled via .env)
+- **Authentication System**
   - Password protection with brute force protection
   - Progressive rate limiting (30s → 2min → 5min → 15min → 1hr → 24hr)
   - "Remember Me" functionality with 30-day persistent login
   - Session timeout protection and IP validation
   - CSRF protection and secure session management
-- 🛡️ **Commercial-Grade Security**
+- **Modern Security**
   - File URLs protected with AES-256-GCM encryption + session binding
   - CSRF protection for file downloads with TTL tokens
   - Secure encrypted cookies for persistent authentication
   - Path traversal protection and comprehensive input validation
   - Multi-layer security logging and monitoring
-- 🎬 Preview media files directly in browser
-- ⏱️ **Flexible Session Management**
+- review media files directly in browser
+-  **Flexible Session Management**
   - 24-hour sessions for regular logins
   - 30-day extended sessions with "Remember Me"
   - Automatic session cleanup and token management
-- 🔄 Easy to customize
-- 🔑 Instructions for CloudFlare Tunnel for reverse proxy protection
-- 💾 Apache and NGNIX agnostic, use your preferred hosting
-- ⚙️ Minimal configuration required via `.env` file
-- 🔗 Only Bootstrap JS used for client-side interactions (no frameworks)
+- Easy to customize
+- Instructions for CloudFlare Tunnel for reverse proxy protection
+- Apache and NGNIX agnostic, use your preferred hosting
+- Minimal configuration required via `.env` file
+- Only Bootstrap JS used for client-side interactions (no frameworks)
 
 ## Installation
 
 1. Clone or download this repository to your web server
 2. Create a `.env` file in the root directory (see Configuration section below)
 3. Ensure your web server has PHP enabled
-4. **Secure your `.env` file** (see Web Server Security section below)
-5. Access your site through your domain or IP address
+4. **(Optional)** Install FFmpeg for video streaming (see Streaming Setup below)
+5. **Secure your `.env` file** (see Web Server Security section below)
+6. Access your site through your domain or IP address
 
 ### Web Server Security
 
@@ -92,7 +100,40 @@ For the AI assisted coders out there, AI agents shouldn't have much of a problem
 
 ### Secondary Access
 
-Since I imagine many people want a secondary account class, you can specify another password and directory. 
+Since I imagine many people want a secondary account class, you can specify another password and directory.
+
+### HLS Video Streaming Configuration
+
+The application now supports HLS video streaming with FFmpeg transcoding. Add these settings to your `.env` file:
+
+```
+# Enable/disable video streaming (when false, NO "View" button for videos)
+ENABLE_STREAMING=true
+
+# Video quality: 480p, 720p, or 1080p
+STREAMING_QUALITY=720p
+
+# Cache directory for transcoded videos
+STREAMING_CACHE_DIR=./cache/hls
+
+# Cache retention (seconds since last access - default 24 hours)
+# Videos can be paused/resumed within this window
+STREAMING_CACHE_TTL=86400
+
+# Hardware acceleration: auto, intel, nvidia, amd, or none
+HW_ACCEL=auto
+
+# FFmpeg paths (usually auto-detected)
+FFMPEG_PATH=/usr/bin/ffmpeg
+FFPROBE_PATH=/usr/bin/ffprobe
+```
+
+**Important Notes:**
+- When `ENABLE_STREAMING=false`, video files will have **NO** "View" button (download only)
+- When `ENABLE_STREAMING=true`, all video files get a "View" button with smart playback
+- MP4/WebM files play directly in the browser (no transcoding needed)
+- MKV/AVI/MOV files are transcoded to HLS on first view, then cached
+- Cache uses last access time, not creation time - videos stay cached while actively watched 
 
 ### Important Notes:
 - Replace `your_secure_password` with a strong password
@@ -101,6 +142,358 @@ Since I imagine many people want a secondary account class, you can specify anot
   - Example: `openssl rand -hex 32` generates something like: `a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456`
 - Set `BASE_DIR` to the directory you want to share
 - Customize `SITE_TITLE` and `SITE_STATS` to personalize your site
+
+## HLS Video Streaming Setup
+
+### Overview
+
+The HLS (HTTP Live Streaming) feature allows you to stream video files directly in the browser with automatic transcoding to a consistent quality (480p/720p/1080p). Videos are transcoded once and cached for quick resume within a 24-hour window.
+
+### Dependencies
+
+**Required for streaming:**
+- FFmpeg with H.264 encoding support
+- PHP with `exec()` function enabled
+- Sufficient disk space for cache (temporary transcoded videos)
+
+**Optional but recommended:**
+- Hardware acceleration support (Intel QuickSync, NVIDIA NVENC, or AMD VCE)
+- VA-API drivers (for Intel/AMD)
+- CUDA toolkit (for NVIDIA)
+
+### Quick Setup
+
+1. **Run the automated setup script:**
+   ```bash
+   cd /path/to/website
+   ./setup-ffmpeg.sh
+   ```
+   
+   This script will:
+   - Install FFmpeg and required tools
+   - Detect available hardware acceleration
+   - Install appropriate drivers
+   - Test encoding capability
+   - Provide recommended `.env` settings
+
+2. **Create/update your `.env` file:**
+   ```bash
+   cp .env.example .env
+   nano .env
+   ```
+   
+   Set `ENABLE_STREAMING=true` and configure other streaming options.
+
+3. **Log out and log back in** (required for group membership changes to take effect)
+
+4. **Test the setup:**
+   ```bash
+   ./start-server.sh
+   ```
+   
+   Access the test server at `http://localhost:8080` and try viewing a video file.
+
+### Hardware Acceleration
+
+Hardware acceleration significantly reduces CPU usage and speeds up transcoding.
+
+**Supported platforms:**
+
+| Platform | Technology | Encoder | Performance |
+|----------|-----------|---------|-------------|
+| Intel | QuickSync (VA-API) | `h264_vaapi` | ⚡⚡⚡ Excellent |
+| NVIDIA | NVENC | `h264_nvenc` | ⚡⚡⚡ Excellent |
+| AMD | VCE (VA-API) | `h264_vaapi` | ⚡⚡ Good |
+| Software | libx264 | `libx264` | ⚡ Slow |
+
+**Auto-detection:**
+
+Set `HW_ACCEL=auto` in your `.env` file (recommended). The system will automatically detect and use the best available hardware acceleration.
+
+**Manual selection:**
+
+If auto-detection fails, you can manually specify:
+- `HW_ACCEL=intel` - Force Intel QuickSync
+- `HW_ACCEL=nvidia` - Force NVIDIA NVENC
+- `HW_ACCEL=amd` - Force AMD VCE
+- `HW_ACCEL=none` - Use software encoding
+
+**Testing hardware acceleration:**
+
+```bash
+# Test Intel QuickSync
+ffmpeg -hwaccel vaapi -hwaccel_device /dev/dri/renderD128 -i test.mkv -c:v h264_vaapi -f null -
+
+# Test NVIDIA NVENC
+ffmpeg -hwaccel cuda -i test.mkv -c:v h264_nvenc -f null -
+
+# Check VA-API info
+vainfo
+```
+
+### Cache Management
+
+The caching system intelligently manages transcoded videos:
+
+**How it works:**
+1. Video is transcoded to HLS on first view
+2. Segments are cached in `STREAMING_CACHE_DIR`
+3. Last access time is updated each time video is played
+4. Cache entries are kept for `STREAMING_CACHE_TTL` seconds since last access
+5. Unwatched videos are automatically cleaned up after TTL expires
+
+**Benefits:**
+- Watch videos immediately after first transcode
+- Pause and resume videos within 24-hour window
+- Rewatch videos without re-transcoding
+- Automatic cleanup prevents disk space issues
+- No manual cache management needed
+
+**Manual cache cleanup:**
+
+```bash
+# Dry run (see what would be deleted)
+php cleanup-cache.php --dry-run --verbose
+
+# Actually clean up (removes expired entries based on TTL)
+php cleanup-cache.php --verbose
+
+# Force clear ALL cache (delete everything)
+rm -rf ./cache/hls/*
+
+# Add to cron (daily cleanup at 3 AM)
+crontab -e
+# Add this line:
+0 3 * * * cd /path/to/website && php cleanup-cache.php >> /var/log/hls-cache-cleanup.log 2>&1
+```
+
+**Cache statistics:**
+
+The cleanup script shows:
+- Number of directories cleaned
+- Space freed
+- Remaining cache size
+- List of cached videos (with `--verbose`)
+
+### Video Quality Settings
+
+Choose the quality that fits your needs:
+
+| Quality | Resolution | Bitrate | Use Case |
+|---------|-----------|---------|----------|
+| 480p | 854x480 | ~2 Mbps | Mobile devices, slower connections |
+| 720p | 1280x720 | ~2 Mbps | Default, good balance |
+| 1080p | 1920x1080 | ~2 Mbps | High quality, requires more bandwidth |
+
+Set `STREAMING_QUALITY` in your `.env` file. Higher quality means:
+- ✅ Better video quality
+- ❌ Larger cache files
+- ❌ More CPU/GPU usage
+- ❌ More bandwidth required
+
+### Supported Video Formats
+
+**Browser-native formats (direct playback, no transcoding):**
+- MP4 (H.264)
+- WebM
+- OGG
+
+**Formats requiring HLS transcoding:**
+- MKV (Matroska)
+- AVI
+- MOV (QuickTime)
+- WMV (Windows Media)
+- FLV (Flash)
+- M4V
+- MPG/MPEG
+- And more...
+
+### Troubleshooting Streaming
+
+#### Videos don't have a "View" button
+
+**Cause:** Streaming is disabled
+
+**Solution:**
+1. Check `.env` file: `ENABLE_STREAMING=true`
+2. Restart web server
+3. Clear browser cache
+
+#### "Video streaming is not enabled" error
+
+**Cause:** Streaming configuration not loaded
+
+**Solution:**
+1. Verify `.env` file exists
+2. Check `ENABLE_STREAMING=true` is set
+3. Verify no syntax errors in `.env`
+4. Check web server logs for configuration errors
+
+#### "FFmpeg not found" error
+
+**Cause:** FFmpeg not installed or wrong path
+
+**Solution:**
+```bash
+# Install FFmpeg
+sudo apt install ffmpeg
+
+# Find FFmpeg path
+which ffmpeg
+
+# Update .env with correct path
+FFMPEG_PATH=/usr/bin/ffmpeg
+```
+
+#### Video transcoding is very slow
+
+**Cause:** Using software encoding (no hardware acceleration)
+
+**Solution:**
+1. Run `./setup-ffmpeg.sh` to check hardware support
+2. Install appropriate drivers:
+   ```bash
+   # Intel
+   sudo apt install intel-media-va-driver i965-va-driver
+   
+   # AMD
+   sudo apt install mesa-va-drivers
+   
+   # NVIDIA
+   # Install CUDA toolkit from nvidia.com
+   ```
+3. Set `HW_ACCEL=auto` in `.env`
+4. Restart web server
+
+#### "Transcoding failed" error
+
+**Possible causes:**
+- Corrupted video file
+- Unsupported codec
+- Insufficient disk space
+- Permission issues
+
+**Solution:**
+```bash
+# Check disk space
+df -h
+
+# Check cache directory permissions
+ls -ld ./cache/hls
+chmod 755 ./cache/hls
+
+# Test FFmpeg manually
+ffmpeg -i /path/to/video.mkv -c:v libx264 -c:a aac test.mp4
+
+# Check web server error logs
+tail -f /var/log/apache2/error.log
+# or
+tail -f /var/log/php_errors.log
+```
+
+#### Videos buffer frequently during playback
+
+**Possible causes:**
+- Slow server CPU
+- Network congestion
+- Quality setting too high for connection speed
+
+**Solution:**
+1. Lower quality setting: `STREAMING_QUALITY=480p`
+2. Enable hardware acceleration
+3. Check server CPU usage during playback
+4. Consider upgrading server hardware
+
+#### Cache fills up disk
+
+**Cause:** Long TTL or many large videos
+
+**Solution:**
+1. Reduce cache TTL: `STREAMING_CACHE_TTL=43200` (12 hours)
+2. Run cleanup script manually: `php cleanup-cache.php`
+3. Add cron job for automatic cleanup
+4. Monitor cache size: `du -sh ./cache/hls`
+
+#### "exec() has been disabled" error
+
+**Cause:** PHP `exec()` function disabled for security
+
+**Solution:**
+Edit `php.ini` and remove `exec` from `disable_functions`:
+```ini
+; Before
+disable_functions = exec,passthru,shell_exec,system
+
+; After
+disable_functions = passthru,shell_exec,system
+```
+
+Then restart web server.
+
+#### Hardware acceleration not working
+
+**Check device access:**
+```bash
+# Check if GPU device exists
+ls -l /dev/dri/renderD128
+
+# Check user permissions
+groups $USER
+
+# Add user to video group if needed
+sudo usermod -a -G video $USER
+sudo usermod -a -G render $USER
+
+# Log out and log back in
+```
+
+**Verify VA-API:**
+```bash
+vainfo
+# Should show driver information and supported profiles
+```
+
+**Verify NVIDIA:**
+```bash
+nvidia-smi
+# Should show GPU information
+
+nvcc --version
+# Should show CUDA version
+```
+
+### Performance Tips
+
+1. **Use hardware acceleration** - Reduces CPU usage by 80-90%
+2. **Adjust quality for your needs** - 720p is usually sufficient
+3. **Monitor cache size** - Set up automatic cleanup
+4. **Use SSD for cache** - Faster read/write for HLS segments
+5. **Allocate sufficient RAM** - FFmpeg needs memory for transcoding
+6. **Test with different codecs** - Some videos transcode faster than others
+
+### Development and Testing
+
+**Start development server:**
+```bash
+./start-server.sh
+# Or custom port:
+./start-server.sh 8081
+```
+
+**Test with sample videos:**
+1. Place test videos in your `BASE_DIR`
+2. Access site at `http://localhost:8080`
+3. Click "View" on a video file
+4. Check transcoding in server logs
+
+**Monitor transcoding:**
+```bash
+# Watch PHP error log
+tail -f /var/log/php_errors.log
+
+# Monitor cache directory
+watch -n 1 "du -sh ./cache/hls && ls -lh ./cache/hls/*/*"
+```
 
 ## Authentication & Security Features
 

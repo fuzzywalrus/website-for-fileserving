@@ -4,7 +4,7 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: SAMEORIGIN');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
-header('Content-Security-Policy: default-src \'self\' https://cdnjs.cloudflare.com; style-src \'self\' https://cdnjs.cloudflare.com \'unsafe-inline\'; script-src \'self\' https://cdnjs.cloudflare.com; font-src \'self\' https://cdnjs.cloudflare.com; img-src \'self\' data:');
+header('Content-Security-Policy: default-src \'self\' https://cdnjs.cloudflare.com https://vjs.zencdn.net https://cdn.jsdelivr.net; style-src \'self\' https://cdnjs.cloudflare.com https://vjs.zencdn.net \'unsafe-inline\'; script-src \'self\' https://cdnjs.cloudflare.com https://vjs.zencdn.net https://cdn.jsdelivr.net; font-src \'self\' https://cdnjs.cloudflare.com; img-src \'self\' data:; media-src \'self\' blob:');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -188,7 +188,15 @@ header('Content-Security-Policy: default-src \'self\' https://cdnjs.cloudflare.c
         </a>
         
         <?php if (isPlayable($item['name'])): ?>
-            <a href="file-handler.php?id=<?= $fileId ?>" target="_blank" class="btn btn-sm btn-outline-success">
+            <?php
+            // Determine the target for the View button
+            $viewTarget = 'file-handler.php';
+            if (isVideoFile($item['name']) && $streamingEnabled) {
+                // Video files go to the video player
+                $viewTarget = 'video-player.php';
+            }
+            ?>
+            <a href="<?= $viewTarget ?>?id=<?= $fileId ?>" target="_blank" class="btn btn-sm btn-outline-success">
                 <i class="fas fa-play"></i> <span class="d-none d-sm-inline">View</span>
             </a>
         <?php endif; ?>
